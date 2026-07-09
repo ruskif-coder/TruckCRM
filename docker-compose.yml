@@ -109,11 +109,11 @@ services:
       - -c
       - |
         apk add --no-cache sqlite >/dev/null 2>&1
-        chmod +x /usr/local/bin/db-backup
+        # Вызываем через sh — скрипт смонтирован :ro, chmod недоступен.
         # Бэкап сразу при запуске контейнера
-        /usr/local/bin/db-backup || true
+        sh /usr/local/bin/db-backup || true
         # Ежедневный бэкап в 03:00 UTC; лог пишется в ./data/backups/backup.log
-        echo '0 3 * * * /usr/local/bin/db-backup >> /backups/backup.log 2>&1' \
+        echo '0 3 * * * sh /usr/local/bin/db-backup >> /backups/backup.log 2>&1' \
           > /etc/crontabs/root
         crond -f -l 8
     restart: unless-stopped
