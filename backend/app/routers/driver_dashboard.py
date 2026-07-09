@@ -61,13 +61,14 @@ def driver_summary(
     if not user.driver_id:
         # Не водитель (нет linked Driver record) - пустой ответ, не ошибка:
         # функция может быть вызвана любым залогиненным пользователем, но
-        # полезна только водителям. Фронтенд (DriverDashboard.tsx) это знает.
+        # полезна только водителями. Фронтенд (DriverDashboard.tsx) это знает.
         return {
             "driver_id": None,
             "driver_name": user.full_name or user.username,
             "balance": 0.0,
             "as_of": None,
             "last_week_trips": 0,
+            "last_week_cancelled": 0,
             "last_week_start": None,
         }
 
@@ -113,26 +114,26 @@ def driver_summary(
     else:
         billing_monday = iso_week_monday(today) - timedelta(weeks=1)
     billing_sunday = billing_monday + timedelta(days=6)
-    # Рейсы без отменённых — регистронезависимо, как в calculations.py:
-    # статус может быть "отмена", "Отменено", "Отменён" и т.д.
-    last_week_trips = session.exec(
-        select(func.count(models.Trip.id)).where(
+    # Рейсы за неделю — Python-side фильтрация статуса, потому что
+    # SQLite LOWER() не поддерживает кириллицу:
+    #   LOWER('Отменено') = 'Отменено'  (не 'отменено')
+    # Python str.lower() работает корректно для любого Unicode.
+    week_trips = session.exec(
+        select(models.Trip).where(
             models.Trip.driver_id == user.driver_id,
             models.Trip.dep_at >= billing_monday,  # type: ignore[arg-type]
             models.Trip.dep_at <= billing_sunday,  # type: ignore[arg-type]
-            ~func.lower(models.Trip.status).startswith("отмен"),
         )
-    ).one() or 0
+    ).all()
 
-    # Отдельно — отменённые рейсы за ту же неделю
-    last_week_cancelled = session.exec(
-        select(func.count(models.Trip.id)).where(
-            models.Trip.driver_id == user.driver_id,
-            models.Trip.dep_at >= billing_monday,  # type: ignore[arg-type]
-            models.Trip.dep_at <= billing_sunday,  # type: ignore[arg-type]
-            func.lower(models.Trip.status).startswith("отмен"),
-        )
-    ).one() or 0
+    last_week_trips = sum(
+        1 for t in week_trips
+        if not (t.status or "").lower().startswith("отмен")
+    )
+    last_week_cancelled = sum(
+        1 for t in week_trips
+        if (t.status or "").lower().startswith("отмен")
+    )
 
     return {
         "driver_id": user.driver_id,

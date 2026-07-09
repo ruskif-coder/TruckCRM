@@ -7,7 +7,7 @@
  */
 import React, { useEffect, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { api, ApiError, logDownload } from "../api";
+import { api, ApiError } from "../api";
 import { useAuth } from "../auth/AuthContext";
 import { isoDate, money } from "../lib/format";
 
@@ -1148,7 +1148,7 @@ export default function DriverDashboard() {
                   value={eDesc} onChange={e => setEDesc(e.target.value)} placeholder="необязательно" />
                 {/* Фото чека — только для компенсаций */}
                 {eType === "compensation" && (<>
-                  <input ref={expensePhotoRef} type="file" accept="image/*"
+                  <input ref={expensePhotoRef} type="file" accept="image/*" capture="environment"
                     style={{ display: "none" }}
                     onChange={async e => {
                       const f = e.target.files?.[0];
@@ -1237,7 +1237,7 @@ export default function DriverDashboard() {
                 {/* Фото */}
                 <input
                   ref={repairPhotoRef}
-                  type="file" accept="image/*"
+                  type="file" accept="image/*" capture="environment"
                   style={{ display: "none" }}
                   onChange={async e => {
                     const f = e.target.files?.[0];
@@ -1814,6 +1814,7 @@ function HandoverSheet({ trucks, activeSession, driverId, onClose, onDone }: Han
             ref={fileRef}
             type="file"
             accept="image/*"
+            capture="environment"
             style={{ display: "none" }}
             onChange={async e => {
               const file = e.target.files?.[0];
@@ -1896,7 +1897,7 @@ function HandoverSheet({ trucks, activeSession, driverId, onClose, onDone }: Han
             <div key={sp.key}>
               <input
                 ref={el => { sideFileRefs.current[i] = el; }}
-                type="file" accept="image/*"
+                type="file" accept="image/*" capture="environment"
                 style={{ display: "none" }}
                 onChange={async e => {
                   const f = e.target.files?.[0];
@@ -2056,7 +2057,6 @@ function TruckInfoSheet({ info, onClose }: { info: TruckInfo; onClose: () => voi
                 fontFamily: "inherit", textDecoration: "none",
                 display: "inline-block", lineHeight: 1.4,
               }}
-              onClick={() => logDownload(doc.scan_path ?? "", "documents")}
             >
               Скачать
             </a>
@@ -2332,7 +2332,7 @@ function CheckRow({
               </button>
               <input
                 ref={photoRef}
-                type="file" accept="image/*"
+                type="file" accept="image/*" capture="environment"
                 style={{ display: "none" }}
                 onChange={e => {
                   const f = e.target.files?.[0];
@@ -2402,7 +2402,7 @@ function CleanRow({ item, onChange, onPhoto, invalid }: {
         </button>
         <input
           ref={cleanFileRef}
-          type="file" accept="image/*"
+          type="file" accept="image/*" capture="environment"
           style={{ display: "none" }}
           onChange={e => { const f = e.target.files?.[0]; if (f) onPhoto(f); e.target.value = ""; }}
         />
