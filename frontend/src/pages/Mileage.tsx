@@ -340,17 +340,29 @@ export default function Mileage({ tabsNav }: { tabsNav?: ReactNode } = {}) {
               }}
             />
           )}
-          <label className="checkbox-row" style={{ width: 130, flexShrink: 0 }}>
-            <input
-              type="checkbox"
-              checked={serviceOnly}
-              onChange={(e) => {
-                setServiceOnly(e.target.checked);
-                setPage(1);
+          <div style={{ flexShrink: 0 }}>
+            <div className="label" style={{ visibility: "hidden" }}>·</div>
+            <button
+              type="button"
+              onClick={() => { setServiceOnly(!serviceOnly); setPage(1); }}
+              style={{
+                height: 46,
+                padding: "0 18px",
+                borderRadius: 999,
+                border: serviceOnly ? "none" : "1.5px solid var(--edge)",
+                background: serviceOnly ? "var(--iris)" : "transparent",
+                color: serviceOnly ? "#fff" : "var(--ink)",
+                fontFamily: "inherit",
+                fontWeight: 600,
+                fontSize: "0.9rem",
+                cursor: "pointer",
+                transition: "all .15s ease",
+                whiteSpace: "nowrap",
               }}
-            />
-            Только ТО
-          </label>
+            >
+              Только ТО
+            </button>
+          </div>
           <div>
             <label className="label">Строк на странице</label>
             <select
