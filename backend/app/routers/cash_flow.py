@@ -55,6 +55,7 @@ def create_entry(
 ):
     data = payload.model_dump()
     data["vat_amount"] = _recompute_vat(data)
+    data["created_by_user_id"] = user.id
     item = models.CashFlowEntry(**data)
     session.add(item)
     session.commit()

@@ -55,6 +55,12 @@ type FMileage = {
   id: number; date: string; truck_id: number; driver_id: number | null;
   odometer: number | null; is_service: boolean; note: string;
 };
+type FExpense = {
+  id: number; date: string; status: string;
+  expense: number; income: number; bank: string;
+  category: string; purpose: string;
+  truck_id: number | null; created_by_user_id: number | null;
+};
 type AttentionData = {
   expiring_docs: {
     truck_id: number; plate: string; label: string;
@@ -304,6 +310,7 @@ export default function ForemanDashboard() {
   const [trips, setTrips] = useState<FTrip[]>([]);
   const [mileages, setMileages] = useState<FMileage[]>([]);
   const [expCats, setExpCats] = useState<string[]>([]);
+  const [myExpenses, setMyExpenses] = useState<FExpense[]>([]);
   const [loading, setLoading] = useState(true);
 
   // ─ Модальное ─
@@ -324,6 +331,17 @@ export default function ForemanDashboard() {
   const [mOdometer, setMOdometer] = useState("");
   const [mNote, setMNote] = useState("");
   const [mIsService, setMIsService] = useState(false);
+
+  // Форма расхода
+  const [expModal, setExpModal] = useState(false);
+  const [eSaving, setESaving] = useState(false);
+  const [eError, setEError] = useState<string | null>(null);
+  const [eDate, setEDate] = useState(new Date().toISOString().slice(0, 10));
+  const [eCategory, setECategory] = useState("");
+  const [eAmount, setEAmount] = useState("");
+  const [eBank, setEBank] = useState("");
+  const [eTruckId, setETruckId] = useState("");
+  const [ePurpose, setEPurpose] = useState("");
 
   // Закрытие заявки на ремонт
   const [closeId, setCloseId] = useState<number | null>(null);
@@ -365,7 +383,7 @@ export default function ForemanDashboard() {
   async function loadAll() {
     setLoading(true);
     try {
-      const [att, trs, drs, reps, cms, trps, mls, cats, sess] = await Promise.allSettled([
+      const [att, trs, drs, reps, cms, trps, mls, cats, sess, exps] = await Promise.allSettled([
         api.get<AttentionData>("/api/foreman-dashboard/attention"),
         api.get<FTruck[]>("/api/trucks/"),
         api.get<FDriver[]>("/api/foreman-dashboard/drivers"),
@@ -375,6 +393,7 @@ export default function ForemanDashboard() {
         api.get<FMileage[]>("/api/mileage-logs/"),
         api.get<{ id: number; name: string }[]>("/api/expense-categories/"),
         api.get<FActiveSession[]>("/api/vehicle-inspections/active-sessions"),
+        api.get<FExpense[]>("/api/expenses/"),
       ]);
       if (att.status === "fulfilled") setAttention(att.value);
       if (trs.status === "fulfilled") setTrucks(trs.value);
@@ -396,6 +415,15 @@ export default function ForemanDashboard() {
       }
       if (cats.status === "fulfilled") setExpCats(cats.value.map((c: { name: string }) => c.name));
       if (sess.status === "fulfilled") setActiveSessions(new Map(sess.value.map(s => [s.truck_id, s])));
+      if (exps.status === "fulfilled") {
+        const since = new Date();
+        since.setDate(since.getDate() - 30);
+        const sinceStr = since.toISOString().slice(0, 10);
+        const mine = (exps.value as FExpense[])
+          .filter(e => e.created_by_user_id === user?.id && e.date >= sinceStr && e.expense > 0)
+          .sort((a, b) => b.date.localeCompare(a.date));
+        setMyExpenses(mine);
+      }
     } finally {
       setLoading(false);
     }
@@ -448,6 +476,37 @@ export default function ForemanDashboard() {
     } catch (e) {
       setFormError(e instanceof ApiError ? e.message : "Ошибка сохранения");
     } finally { setSaving(false); }
+  }
+
+  async function submitExpense() {
+    if (!eCategory || !eAmount || Number(eAmount) <= 0) {
+      setEError("Укажите статью и сумму"); return;
+    }
+    setESaving(true); setEError(null);
+    try {
+      const month = eDate.slice(5, 7) + "-" + eDate.slice(0, 4); // "07-2026"
+      await api.post("/api/expenses/", {
+        date: eDate,
+        status: "ОПЛАЧЕНО",
+        expense: Number(eAmount),
+        income: 0,
+        bank: eBank,
+        category: eCategory,
+        purpose: ePurpose,
+        period: month,
+        truck_id: eTruckId ? Number(eTruckId) : null,
+        driver_id: null,
+        vat_pct: 0,
+        counterparty: "",
+        fuel_source_key: "",
+      });
+      setExpModal(false);
+      setEDate(new Date().toISOString().slice(0, 10));
+      setECategory(""); setEAmount(""); setEBank(""); setETruckId(""); setEPurpose("");
+      await loadAll();
+    } catch (e) {
+      setEError(e instanceof ApiError ? e.message : "Ошибка сохранения");
+    } finally { setESaving(false); }
   }
 
   async function changeRepairStatus(id: number, status: RepairStatus) {
@@ -565,10 +624,56 @@ export default function ForemanDashboard() {
         </SCard>
 
         {/* Быстрые действия */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <ActionBtn icon="🔧" label="Новая заявка на ремонт" onClick={() => openModal("repair")} accent />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+          <ActionBtn icon="🔧" label="Заявка на ремонт" onClick={() => openModal("repair")} accent />
           <ActionBtn icon="📏" label="Внести пробег" onClick={() => openModal("mileage")} />
+          <ActionBtn icon="💰" label="Расход" onClick={() => { setEError(null); setExpModal(true); }} />
         </div>
+
+        {/* Мои расходы за 30 дней */}
+        <SCard>
+          <div style={{ fontWeight: 700, fontSize: 15, color: C.ink, marginBottom: 10 }}>
+            💰 Мои расходы <span style={{ fontWeight: 400, fontSize: 13, color: C.ink2 }}>(30 дней)</span>
+          </div>
+          {myExpenses.length === 0 ? (
+            <p style={{ color: C.ink2, fontSize: 13, margin: 0 }}>Нет записей за последние 30 дней</p>
+          ) : (
+            <>
+              <div style={{
+                fontSize: 13, fontWeight: 700, color: C.danger,
+                marginBottom: 8, paddingBottom: 8, borderBottom: `1px solid ${C.border}`,
+              }}>
+                Итого: {money(myExpenses.reduce((s, e) => s + e.expense, 0))}
+              </div>
+              {myExpenses.slice(0, 10).map(e => (
+                <div key={e.id} style={{
+                  display: "flex", justifyContent: "space-between", alignItems: "flex-start",
+                  padding: "7px 0", borderBottom: `1px solid ${C.border}`,
+                }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: C.ink }}>{e.category}</div>
+                    <div style={{ fontSize: 11, color: C.ink2, marginTop: 2 }}>
+                      {fmtDate(e.date)}
+                      {e.bank ? ` · ${e.bank}` : ""}
+                      {e.truck_id && truckMap[e.truck_id] ? ` · ${truckMap[e.truck_id]}` : ""}
+                    </div>
+                    {e.purpose && (
+                      <div style={{ fontSize: 11, color: C.ink2, marginTop: 1 }}>{e.purpose}</div>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: C.danger, flexShrink: 0, marginLeft: 10 }}>
+                    {money(e.expense)}
+                  </div>
+                </div>
+              ))}
+              {myExpenses.length > 10 && (
+                <div style={{ fontSize: 12, color: C.ink2, textAlign: "center", marginTop: 6 }}>
+                  + ещё {myExpenses.length - 10} записей
+                </div>
+              )}
+            </>
+          )}
+        </SCard>
       </div>
     );
   }
@@ -1553,6 +1658,49 @@ export default function ForemanDashboard() {
           </div>
         );
       })()}
+
+      {/* Модал: Добавить расход */}
+      {expModal && (
+        <Modal
+          title="Добавить расход"
+          onClose={() => { setExpModal(false); setEError(null); }}
+          onSubmit={submitExpense}
+          saving={eSaving}
+          error={eError}
+          submitLabel="Добавить расход"
+        >
+          <input type="date" style={inputSt} value={eDate} onChange={e => setEDate(e.target.value)} />
+          <select style={inputSt} value={eCategory} onChange={e => setECategory(e.target.value)}>
+            <option value="">Статья *</option>
+            {expCats.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <input
+            type="number"
+            inputMode="decimal"
+            placeholder="Сумма (₽) *"
+            style={inputSt}
+            value={eAmount}
+            onChange={e => setEAmount(e.target.value)}
+          />
+          <select style={inputSt} value={eBank} onChange={e => setEBank(e.target.value)}>
+            <option value="">Банк / источник</option>
+            {["АльфаКарта", "Альфабанк", "Личные", "Фирма", "Наличные"].map(b => (
+              <option key={b} value={b}>{b}</option>
+            ))}
+          </select>
+          <select style={inputSt} value={eTruckId} onChange={e => setETruckId(e.target.value)}>
+            <option value="">Машина (необязательно)</option>
+            {trucks.map(t => <option key={t.id} value={t.id}>{t.plate}</option>)}
+          </select>
+          <input
+            type="text"
+            placeholder="Назначение (необязательно)"
+            style={inputSt}
+            value={ePurpose}
+            onChange={e => setEPurpose(e.target.value)}
+          />
+        </Modal>
+      )}
 
       {/* Модал: Акт приёмки-сдачи (флот) */}
       {fleetSessionId !== null && (

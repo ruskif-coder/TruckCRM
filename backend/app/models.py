@@ -566,6 +566,10 @@ class CashFlowEntryBase(SQLModel):
     # дубли, и не трогает status/vat_pct/counterparty/purpose, если бухгалтер
     # их уже отредактировал вручную.
     fuel_source_key: str = ""
+    # 2026-07-09: кабинет бригадира — расходы от имени бригадира.
+    # Пустая строка у строк, созданных до этого поля (NULL → None в Pydantic).
+    # Заполняется автоматически в routers/cash_flow.py::create_entry из JWT.
+    created_by_user_id: Optional[int] = None
 
 
 class CashFlowEntry(CashFlowEntryBase, table=True):
