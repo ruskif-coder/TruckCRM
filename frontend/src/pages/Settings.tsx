@@ -3,6 +3,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { api, ApiError } from "../api";
 import Icon from "../components/Icon";
 import { useAuth } from "../auth/AuthContext";
+import { APP_VERSION } from "../version";
 import { useTheme } from "../theme/ThemeContext";
 import { UsersTable } from "./Users";
 
@@ -129,6 +130,16 @@ function ProfileTab({ tabsNav }: { tabsNav?: ReactNode }) {
           Тёмная
         </button>
       </div>
+
+      <SectionLabel>О системе</SectionLabel>
+      <Row>
+        <div style={{ flex: 1 }}>
+          <div className="label">Версия</div>
+          <div style={{ fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
+            v{APP_VERSION}
+          </div>
+        </div>
+      </Row>
       </div>
     </div>
   );

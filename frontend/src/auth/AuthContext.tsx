@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { clearToken, getToken, login as loginRequest, setToken } from "../api";
+import { API_URL, clearToken, getToken, login as loginRequest, setToken } from "../api";
 
 // driver_id добавлен 2026-06-29 ("журнал пробегов", вкладка "Пробеги" в
 // "Рейсы") - нужен, чтобы форма добавления записи могла понять, что вошёл
@@ -33,7 +33,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setReady(true);
       return;
     }
-    fetch(`${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/auth/me`, {
+    fetch(`${API_URL}/api/auth/me`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => {
@@ -57,7 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // выход при ошибке сети — токен всё равно удаляется на клиенте.
     const token = getToken();
     if (token) {
-      fetch(`${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/auth/logout`, {
+      fetch(`${API_URL}/api/auth/logout`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       }).catch(() => {/* игнорируем — logout не блокируем */});
