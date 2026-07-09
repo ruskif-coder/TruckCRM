@@ -11,11 +11,13 @@ __pycache__/
 .env.staging
 
 # Данные runtime — не коммитить (БД, фото, сканы документов, бэкапы)
-data/
-data_staging/
+# Ведущий / привязывает правило к корню репозитория,
+# чтобы не блокировать frontend/src/data/ и подобные вложенные папки.
+/data/
+/data_staging/
 
 # Логи деплоя
-logs/
+/logs/
 
 # Артефакты сборки Vite и TypeScript
 vite.config.ts.timestamp-*.mjs
