@@ -154,6 +154,7 @@ app.include_router(dashboard.router, dependencies=protected)
 app.include_router(settings_router.router, dependencies=protected)
 app.include_router(role_permissions_router.router, dependencies=protected)
 app.include_router(audit_log_router.router, dependencies=protected)
+app.include_router(audit_log_router.download_router, dependencies=protected)
 # Дашборд водителя (мобильный, 2026-06-30): заявки на ремонт + быстрый
 # ввод расхода + баланс/рейсы за неделю. Auth-only (не zone-gated),
 # работает только с данными самого вошедшего пользователя.

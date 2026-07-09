@@ -145,6 +145,21 @@ export const api = {
   },
 };
 
+/**
+ * Логирует скачивание файла в журнал действий (fire-and-forget).
+ * Вызывается из onClick на <a download> элементах — ошибки игнорируются,
+ * чтобы не блокировать скачивание при проблемах с сетью/сессией.
+ */
+export function logDownload(filename: string, zone = "documents"): void {
+  const token = getToken();
+  if (!token) return;
+  fetch(`${API_URL}/api/audit-log/download`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ filename, zone }),
+  }).catch(() => {/* игнорируем */});
+}
+
 export async function login(username: string, password: string) {
   const form = new URLSearchParams();
   form.append("username", username);

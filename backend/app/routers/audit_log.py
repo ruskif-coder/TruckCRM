@@ -4,15 +4,21 @@
 permissions.py module docstring) - иначе роль могла бы сама себе выдать
 доступ к собственному журналу и скрыть следы. Чтение по записям пишет
 app/audit.py::log_action из каждого роутера; этот файл - только GET, без
-мутаций (сам журнал не редактируется и не удаляется через API)."""
+мутаций (сам журнал не редактируется и не удаляется через API).
+
+POST /api/audit-log/download — исключение из admin-only правила: любой
+авторизованный пользователь может записать факт скачивания файла. Выделен
+в отдельный router без Depends(require_role("admin")), чтобы не блокировать
+водителей и других пользователей при скачивании документов."""
 
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
 from sqlmodel import Session, select
+from pydantic import BaseModel
 
-from .. import models
-from ..auth import require_role
+from .. import audit, models
+from ..auth import get_current_user, require_role
 from ..database import get_session
 from ..audit import ACTION_LABELS, ZONE_LABELS
 
@@ -21,6 +27,32 @@ router = APIRouter(
     tags=["audit-log"],
     dependencies=[Depends(require_role("admin"))],
 )
+
+# Отдельный роутер без admin-only, для fire-and-forget логирования скачиваний
+download_router = APIRouter(prefix="/api/audit-log", tags=["audit-log"])
+
+
+class _DownloadPayload(BaseModel):
+    filename: str
+    zone: str = "documents"
+
+
+@download_router.post("/download", status_code=204)
+def log_download(
+    payload: _DownloadPayload,
+    session: Session = Depends(get_session),
+    user: models.User = Depends(get_current_user),
+):
+    """Фиксирует скачивание файла в журнале. Доступен любой авторизованной
+    роли — водители тоже скачивают документы на своём ТС."""
+    audit.log_action(
+        session,
+        user=user,
+        action="download_file",
+        zone=payload.zone,
+        entity_label=payload.filename,
+    )
+    return None
 
 
 @router.get("/")

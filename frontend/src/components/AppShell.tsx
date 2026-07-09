@@ -13,6 +13,7 @@ import { type CSSProperties, useEffect, useRef, useState } from "react";
 import { NavLink, Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { api } from "../api";
 import { useAuth } from "../auth/AuthContext";
+import { useTheme } from "../theme/ThemeContext";
 import Icon, { type IconName } from "./Icon";
 
 // Порядок и состав разделов наведён в порядок 2026-06-28 («наведём порядок»):
@@ -104,6 +105,7 @@ export default function AppShell() {
   const { pathname } = useLocation();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { theme, toggleTheme } = useTheme();
   const meta = META[pathname];
 
   // Счётчик открытых заявок на ремонт — показывается как бейдж на пункте «Ремонт».
@@ -251,8 +253,12 @@ export default function AppShell() {
           </NavLink>
         ))}
         <div className="rail-spacer" />
-        <button className="rail-btn" title="Выйти" onClick={handleLogout}>
-          <Icon name="cog" size={21} />
+        <button
+          className="rail-btn"
+          title={theme === "light" ? "Тёмная тема" : "Светлая тема"}
+          onClick={toggleTheme}
+        >
+          {theme === "light" ? "🌙" : "☀️"}
         </button>
       </aside>
 

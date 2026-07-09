@@ -51,6 +51,20 @@ def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), se
     }
 
 
+@router.post("/logout", status_code=204)
+def logout(
+    session: Session = Depends(get_session),
+    user: models.User = Depends(get_current_user),
+):
+    """Фиксирует выход из системы в журнале. JWT-токен статeless — сервер
+    его не инвалидирует, только пишет запись в лог и обновляет last_seen_at."""
+    user.last_seen_at = datetime.utcnow()
+    session.add(user)
+    session.commit()
+    audit.log_action(session, user=user, action="logout", zone="auth", entity_id=user.id)
+    return None
+
+
 @router.post("/change-password", status_code=204)
 def change_password(
     payload: models.ChangePasswordRequest,

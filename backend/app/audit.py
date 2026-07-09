@@ -51,9 +51,11 @@ ACTION_LABELS: dict[str, str] = {
     "delete": "удалил",
     "login_success": "вошёл в систему",
     "login_failed": "не смог войти в систему",
+    "logout": "вышел из системы",
     "import": "импортировал",
     "post_to_expenses": "провёл в расходы",
     "reset_password": "сбросил пароль",
+    "download_file": "скачал файл",
 }
 
 

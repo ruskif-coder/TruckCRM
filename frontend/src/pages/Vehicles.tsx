@@ -19,7 +19,7 @@
 // вместо новых полей в БД (подтверждено пользователем).
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { api, ApiError } from "../api";
+import { api, ApiError, logDownload } from "../api";
 import Icon from "../components/Icon";
 
 // Дублирует backend/app/models.py::VEHICLE_TYPES/BODY_TYPES (тот же приём,
@@ -998,6 +998,7 @@ function DocScanBlock({
             target="_blank"
             rel="noreferrer"
             style={{ fontSize: 12, color: "var(--iris)", fontWeight: 600 }}
+            onClick={() => logDownload(scanFilename, "documents")}
           >
             ↓ Скачать
           </a>

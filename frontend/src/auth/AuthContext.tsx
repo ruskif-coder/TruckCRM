@@ -53,6 +53,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   function logout() {
+    // Fire-and-forget: пишем запись в журнал; не ждём ответа и не блокируем
+    // выход при ошибке сети — токен всё равно удаляется на клиенте.
+    const token = getToken();
+    if (token) {
+      fetch(`${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/auth/logout`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      }).catch(() => {/* игнорируем — logout не блокируем */});
+    }
     clearToken();
     setUser(null);
   }
