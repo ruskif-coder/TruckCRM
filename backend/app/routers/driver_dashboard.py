@@ -113,13 +113,14 @@ def driver_summary(
     else:
         billing_monday = iso_week_monday(today) - timedelta(weeks=1)
     billing_sunday = billing_monday + timedelta(days=6)
-    # Рейсы без статуса "отмена" — то что фактически выполнено
+    # Рейсы без отменённых — регистронезависимо, как в calculations.py:
+    # статус может быть "отмена", "Отменено", "Отменён" и т.д.
     last_week_trips = session.exec(
         select(func.count(models.Trip.id)).where(
             models.Trip.driver_id == user.driver_id,
             models.Trip.dep_at >= billing_monday,  # type: ignore[arg-type]
             models.Trip.dep_at <= billing_sunday,  # type: ignore[arg-type]
-            models.Trip.status != "отмена",
+            ~func.lower(models.Trip.status).startswith("отмен"),
         )
     ).one() or 0
 
@@ -129,7 +130,7 @@ def driver_summary(
             models.Trip.driver_id == user.driver_id,
             models.Trip.dep_at >= billing_monday,  # type: ignore[arg-type]
             models.Trip.dep_at <= billing_sunday,  # type: ignore[arg-type]
-            models.Trip.status == "отмена",
+            func.lower(models.Trip.status).startswith("отмен"),
         )
     ).one() or 0
 
