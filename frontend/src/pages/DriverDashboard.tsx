@@ -18,6 +18,7 @@ type Summary = {
   balance: number;
   as_of: string | null;
   last_week_trips: number;
+  last_week_cancelled: number;
   last_week_start: string | null;
 };
 type WeeklyRow = {
@@ -654,59 +655,90 @@ export default function DriverDashboard() {
             </div>
           </div>
 
-          {/* ── Карточка рейсов ── */}
-          <button
-            onClick={() => {
-              const from = summary?.last_week_start ?? null;
-              const to = lastWeekEnd;
-              navigate(`/driver/trips${from && to ? `?from=${from}&to=${to}` : ""}`);
-            }}
-            style={{
-              background: C.card,
-              borderRadius: C.radius,
-              boxShadow: C.cardShadow,
-              padding: "18px 20px",
-              marginBottom: 20,
-              width: "100%",
-              border: "none",
-              cursor: "pointer",
-              textAlign: "left",
-              display: "flex",
-              alignItems: "center",
-              gap: 16,
-              fontFamily: "inherit",
-            }}
-          >
-            <div style={{
-              width: 52, height: 52, borderRadius: 14,
-              background: C.dark,
-              display: "grid", placeItems: "center",
-              flexShrink: 0,
-            }}>
-              <span
-                style={{
-                  fontFamily: "'icon-works', sans-serif",
-                  fontSize: 26,
-                  color: "#ffffff",
-                  lineHeight: 1,
-                  userSelect: "none",
-                }}
-                dangerouslySetInnerHTML={{ __html: "&#66;" }}
-              />
-            </div>
-
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 12, color: C.ink2, marginBottom: 3 }}>Рейсов за неделю</div>
-              <div style={{ fontSize: 30, fontWeight: 700, color: C.ink, lineHeight: 1 }}>
-                {summary?.last_week_trips ?? 0}
+          {/* ── Карточки рейсов ── */}
+          <div style={{ display: "grid", gridTemplateColumns: (summary?.last_week_cancelled ?? 0) > 0 ? "1fr 1fr" : "1fr", gap: 10, marginBottom: 20 }}>
+            {/* Рейсов за неделю (без отмены) */}
+            <button
+              onClick={() => {
+                const from = summary?.last_week_start ?? null;
+                const to = lastWeekEnd;
+                navigate(`/driver/trips${from && to ? `?from=${from}&to=${to}` : ""}`);
+              }}
+              style={{
+                background: C.card,
+                borderRadius: C.radius,
+                boxShadow: C.cardShadow,
+                padding: "18px 16px",
+                width: "100%",
+                border: "none",
+                cursor: "pointer",
+                textAlign: "left",
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                fontFamily: "inherit",
+              }}
+            >
+              <div style={{
+                width: 44, height: 44, borderRadius: 12,
+                background: C.dark,
+                display: "grid", placeItems: "center",
+                flexShrink: 0,
+              }}>
+                <span
+                  style={{
+                    fontFamily: "'icon-works', sans-serif",
+                    fontSize: 22,
+                    color: "#ffffff",
+                    lineHeight: 1,
+                    userSelect: "none",
+                  }}
+                  dangerouslySetInnerHTML={{ __html: "&#66;" }}
+                />
               </div>
-              <div style={{ fontSize: 12, color: C.ink2, marginTop: 4 }}>
-                {weekLabel(summary?.last_week_start ?? null, lastWeekEnd)}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 11, color: C.ink2, marginBottom: 2 }}>Рейсов за неделю</div>
+                <div style={{ fontSize: 28, fontWeight: 700, color: C.ink, lineHeight: 1 }}>
+                  {summary?.last_week_trips ?? 0}
+                </div>
+                <div style={{ fontSize: 11, color: C.ink2, marginTop: 3 }}>
+                  {weekLabel(summary?.last_week_start ?? null, lastWeekEnd)}
+                </div>
               </div>
-            </div>
+              <div style={{ color: C.ink2, fontSize: 18 }}>›</div>
+            </button>
 
-            <div style={{ color: C.ink2, fontSize: 20, paddingRight: 2 }}>›</div>
-          </button>
+            {/* Отменённые рейсы — показываем только если есть */}
+            {(summary?.last_week_cancelled ?? 0) > 0 && (
+              <div style={{
+                background: C.card,
+                borderRadius: C.radius,
+                boxShadow: C.cardShadow,
+                padding: "18px 16px",
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+              }}>
+                <div style={{
+                  width: 44, height: 44, borderRadius: 12,
+                  background: "#e74c3c18",
+                  display: "grid", placeItems: "center",
+                  flexShrink: 0,
+                }}>
+                  <span style={{ fontSize: 22, lineHeight: 1 }}>✕</span>
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 11, color: C.ink2, marginBottom: 2 }}>Отменено</div>
+                  <div style={{ fontSize: 28, fontWeight: 700, color: "#e74c3c", lineHeight: 1 }}>
+                    {summary?.last_week_cancelled}
+                  </div>
+                  <div style={{ fontSize: 11, color: C.ink2, marginTop: 3 }}>
+                    {weekLabel(summary?.last_week_start ?? null, lastWeekEnd)}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* ── Кнопки действий 2×2 ── */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>

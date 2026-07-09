@@ -113,12 +113,23 @@ def driver_summary(
     else:
         billing_monday = iso_week_monday(today) - timedelta(weeks=1)
     billing_sunday = billing_monday + timedelta(days=6)
-    # SQL COUNT вместо Python-цикла по всем рейсам (#147)
+    # Рейсы без статуса "отмена" — то что фактически выполнено
     last_week_trips = session.exec(
         select(func.count(models.Trip.id)).where(
             models.Trip.driver_id == user.driver_id,
             models.Trip.dep_at >= billing_monday,  # type: ignore[arg-type]
             models.Trip.dep_at <= billing_sunday,  # type: ignore[arg-type]
+            models.Trip.status != "отмена",
+        )
+    ).one() or 0
+
+    # Отдельно — отменённые рейсы за ту же неделю
+    last_week_cancelled = session.exec(
+        select(func.count(models.Trip.id)).where(
+            models.Trip.driver_id == user.driver_id,
+            models.Trip.dep_at >= billing_monday,  # type: ignore[arg-type]
+            models.Trip.dep_at <= billing_sunday,  # type: ignore[arg-type]
+            models.Trip.status == "отмена",
         )
     ).one() or 0
 
@@ -128,6 +139,7 @@ def driver_summary(
         "balance": balance,
         "as_of": as_of,
         "last_week_trips": last_week_trips,
+        "last_week_cancelled": last_week_cancelled,
         "last_week_start": billing_monday,
     }
 
