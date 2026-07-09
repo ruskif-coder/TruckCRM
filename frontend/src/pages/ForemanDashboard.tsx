@@ -342,6 +342,8 @@ export default function ForemanDashboard() {
   const [eBank, setEBank] = useState("");
   const [eTruckId, setETruckId] = useState("");
   const [ePurpose, setEPurpose] = useState("");
+  const [ePhotos, setEPhotos] = useState<string[]>([]);
+  const [eUploading, setEUploading] = useState(false);
 
   // Закрытие заявки на ремонт
   const [closeId, setCloseId] = useState<number | null>(null);
@@ -478,6 +480,15 @@ export default function ForemanDashboard() {
     } finally { setSaving(false); }
   }
 
+  async function uploadExpensePhoto(file: File) {
+    setEUploading(true);
+    try {
+      const res = await api.upload<{ filename: string }>("/api/expenses/photo", file);
+      setEPhotos(prev => [...prev, res.filename]);
+    } catch { /* тихо — пользователь увидит что фото не добавилось */ }
+    finally { setEUploading(false); }
+  }
+
   async function submitExpense() {
     if (!eCategory || !eAmount || Number(eAmount) <= 0) {
       setEError("Укажите статью и сумму"); return;
@@ -499,10 +510,12 @@ export default function ForemanDashboard() {
         vat_pct: 0,
         counterparty: "",
         fuel_source_key: "",
+        photo_paths: JSON.stringify(ePhotos),
       });
       setExpModal(false);
       setEDate(new Date().toISOString().slice(0, 10));
       setECategory(""); setEAmount(""); setEBank(""); setETruckId(""); setEPurpose("");
+      setEPhotos([]);
       await loadAll();
     } catch (e) {
       setEError(e instanceof ApiError ? e.message : "Ошибка сохранения");
@@ -1699,6 +1712,65 @@ export default function ForemanDashboard() {
             value={ePurpose}
             onChange={e => setEPurpose(e.target.value)}
           />
+
+          {/* Фото чека */}
+          <div>
+            <div style={{ fontSize: 12, color: C.ink2, marginBottom: 6 }}>Фото чека</div>
+            <label style={{
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+              width: "100%", padding: "11px 0", borderRadius: 10,
+              border: `2px dashed ${eUploading ? C.iris : C.border}`,
+              cursor: eUploading ? "default" : "pointer",
+              background: eUploading ? C.irisLight : C.bg,
+              color: eUploading ? C.iris : C.ink2,
+              fontSize: 13, fontFamily: "inherit", boxSizing: "border-box",
+              transition: "all .15s ease",
+            }}>
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                disabled={eUploading}
+                style={{ display: "none" }}
+                onChange={async e => {
+                  const files = Array.from(e.target.files ?? []);
+                  for (const f of files) await uploadExpensePhoto(f);
+                  e.target.value = "";
+                }}
+              />
+              {eUploading ? "Загрузка..." : "📷 Прикрепить фото чека"}
+            </label>
+            {ePhotos.length > 0 && (
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+                {ePhotos.map((f, i) => (
+                  <div key={f} style={{ position: "relative" }}>
+                    <img
+                      src={`/photos/${f}`}
+                      style={{
+                        width: 72, height: 72, objectFit: "cover",
+                        borderRadius: 10, border: `1px solid ${C.border}`,
+                        display: "block",
+                      }}
+                      alt="чек"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setEPhotos(prev => prev.filter((_, j) => j !== i))}
+                      style={{
+                        position: "absolute", top: -6, right: -6,
+                        background: C.danger, color: "#fff",
+                        border: "none", borderRadius: "50%",
+                        width: 20, height: 20, fontSize: 11,
+                        cursor: "pointer", lineHeight: 1,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        padding: 0, fontWeight: 700,
+                      }}
+                    >✕</button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </Modal>
       )}
 

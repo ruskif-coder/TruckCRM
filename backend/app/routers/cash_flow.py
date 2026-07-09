@@ -1,9 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException
+import os
+import uuid
+
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlmodel import Session, select
 
 from .. import audit, models
 from ..auth import get_current_user, require_zone
 from ..database import get_session
+
+PHOTOS_DIR = os.environ.get("PHOTOS_DIR", "./photos")
 
 # Custom router (not the generic make_router) because two things need extra
 # logic the generic CRUD factory doesn't have: server-side НДС ФАКТ
@@ -31,6 +36,27 @@ def _recompute_vat(data: dict) -> float:
     expense = data.get("expense") or 0
     vat_pct = data.get("vat_pct") or 0
     return round((income + expense) * vat_pct / 100, 2)
+
+
+@router.post("/photo", dependencies=_write)
+async def upload_expense_photo(
+    file: UploadFile = File(...),
+    user: models.User = Depends(get_current_user),
+):
+    """Загрузить фото чека к расходу. Возвращает { filename }.
+    Файл сохраняется в PHOTOS_DIR — тот же каталог, что и фото актов П/П,
+    отдаётся через /photos/<filename> (StaticFiles в main.py)."""
+    os.makedirs(PHOTOS_DIR, exist_ok=True)
+    raw_name = file.filename or "receipt"
+    ext = os.path.splitext(raw_name)[-1].lower()
+    if ext not in (".jpg", ".jpeg", ".png", ".heic", ".webp"):
+        ext = ".jpg"
+    filename = f"rcpt_{uuid.uuid4().hex}{ext}"
+    path = os.path.join(PHOTOS_DIR, filename)
+    content = await file.read()
+    with open(path, "wb") as fh:
+        fh.write(content)
+    return {"filename": filename}
 
 
 @router.get("/", dependencies=_read)

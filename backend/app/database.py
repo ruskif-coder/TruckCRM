@@ -109,6 +109,8 @@ _PENDING_COLUMNS: dict[str, list[tuple[str, str, str]]] = {
         ("fuel_source_key", "VARCHAR", "''"),
         # Added 2026-07-09: кабинет бригадира — кто создал запись расхода.
         ("created_by_user_id", "INTEGER", "NULL"),
+        # Added 2026-07-09: фото чеков (JSON-список имён файлов).
+        ("photo_paths", "VARCHAR", "''"),
     ],
     # Added 2026-06-29 for the "Пробеги" tab (см. models.MileageLogBase.driver_id,
     # own_filter_field в main.py) - таблица mileagelog уже существовала

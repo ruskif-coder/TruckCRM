@@ -570,6 +570,9 @@ class CashFlowEntryBase(SQLModel):
     # Пустая строка у строк, созданных до этого поля (NULL → None в Pydantic).
     # Заполняется автоматически в routers/cash_flow.py::create_entry из JWT.
     created_by_user_id: Optional[int] = None
+    # 2026-07-09: фото чеков, приложенных бригадиром (JSON-список имён файлов).
+    # Хранятся в PHOTOS_DIR (/photos/ в Docker), отдаются через /photos/<filename>.
+    photo_paths: str = ""
 
 
 class CashFlowEntry(CashFlowEntryBase, table=True):
@@ -595,6 +598,7 @@ class CashFlowEntryUpdate(SQLModel):
     counterparty: Optional[str] = None
     purpose: Optional[str] = None
     fuel_source_key: Optional[str] = None
+    photo_paths: Optional[str] = None
 
 
 class CashFlowBulkUpdate(SQLModel):
