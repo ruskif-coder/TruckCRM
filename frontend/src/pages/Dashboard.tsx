@@ -607,7 +607,7 @@ function WeeklyBreakdown() {
       )}
 
       {data && data.notes.length > 0 && (
-        <div className="fcard" style={{ fontSize: "0.82rem", color: "var(--ink-3)", lineHeight: 1.5 }}>
+        <div className="fcard" style={{ marginTop: 12, fontSize: "0.82rem", color: "var(--ink-3)", lineHeight: 1.5 }}>
           {data.notes.map((n, i) => (
             <div key={i} style={{ marginBottom: i < data.notes.length - 1 ? 6 : 0 }}>
               ⚠ {n}

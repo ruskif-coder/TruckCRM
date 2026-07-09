@@ -21,12 +21,26 @@ export default function Login() {
   const [forgotError, setForgotError] = useState<string | null>(null);
   const [forgotLoading, setForgotLoading] = useState(false);
 
+  // Нормализация телефона: убирает всё кроме цифр, приводит 8-xxx и +7-xxx к 7xxx.
+  // Срабатывает только если похоже на телефон (10 или 11 цифр); иначе возвращает
+  // строку как есть (для обычных текстовых логинов).
+  function normalizeUsername(raw: string): string {
+    const digits = raw.replace(/\D/g, "");
+    if (digits.length === 11 && (digits[0] === "7" || digits[0] === "8")) {
+      return "7" + digits.slice(1);
+    }
+    if (digits.length === 10) {
+      return "7" + digits;
+    }
+    return raw.trim();
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setLoading(true);
     try {
-      const u = await login(username, password);
+      const u = await login(normalizeUsername(username), password);
       // Водители и бригадиры — мобильный дашборд, остальные — главная
       const dest = u.role === "driver" ? "/driver" : u.role === "foreman" ? "/foreman" : "/";
       navigate(dest, { replace: true });
