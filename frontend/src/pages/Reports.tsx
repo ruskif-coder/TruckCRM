@@ -1,0 +1,591 @@
+// Отчёты (задача #136, 2026-06-26; выбор периода — задача #137, 2026-06-28) —
+// отдельная вкладка на основе виджета "Расчёт по неделям" с Дашборда: тот же
+// разрез перевозчик×машина×водитель по /api/dashboard/weekly (формулы и
+// honest-оговорки — backend/app/calculations.py weekly_pnl, типы —
+// ../lib/weekly.ts, общие с Dashboard.tsx), но как полноценная страница с
+// фильтрами по колонкам (перевозчик/машина/водитель) и сортировкой по клику
+// на заголовок столбца — то, что в узком виджете на Дашборде не нужно.
+// Фильтрация и сортировка — на клиенте, по уже загруженным данным периода;
+// сам период теперь выбирается тем же календарным .pill-btn, что и на
+// Дашборде (см. ../components/DateRangePicker), а не честным дефолтом
+// backend'а "последние 4 недели от последнего рейса" — здесь это отдельный
+// отчёт с произвольным периодом, по умолчанию открывается на последних 5
+// неделях (lastNWeeksRange(5), по просьбе пользователя). date_from/date_to
+// передаются в /api/dashboard/weekly явно при каждом запросе.
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { api, ApiError } from "../api";
+import Icon from "../components/Icon";
+import MultiSelect from "../components/MultiSelect";
+import DateRangePicker, { lastNWeeksRange } from "../components/DateRangePicker";
+import { fmtDate, money, uniqueSorted } from "../lib/format";
+import { pct, type WeeklyData, type WeeklyRow } from "../lib/weekly";
+import SkeletonRows from "../components/Skeleton";
+
+type FlatRow = WeeklyRow & { week_start: string; week_end: string };
+
+type SortKey =
+  | "period"
+  | "carrier_name"
+  | "truck_label"
+  | "driver_label"
+  | "trips"
+  | "gross"
+  | "commission_pct"
+  | "commission_rub"
+  | "net"
+  | "fines"
+  | "toll"
+  | "fuel"
+  | "driver_pct"
+  | "driver_payout"
+  | "profit"
+  | "profitability"
+  | "price_per_trip"
+  | "price_per_day";
+
+type SortDir = "asc" | "desc";
+
+// «Вид» (2026-06-29, тумблер справа в строке фильтров) — режим «для
+// водителя» прячет колонки с коммерческой/финансовой стороной рейса
+// (выручка, % ПР, комиссия, прибыль, рентабельность, цена рейса), которые
+// водителю показывать не нужно — оставляет только то, что касается его
+// самого (рейсы, штрафы, дорога, топливо, % и выплата водителю).
+type ReportView = "full" | "driver";
+const DRIVER_HIDDEN_COLUMNS = new Set<SortKey>([
+  "gross",
+  "commission_pct",
+  "commission_rub",
+  "profit",
+  "profitability",
+  "price_per_trip",
+  "price_per_day",
+]);
+
+const COLUMNS: { key: SortKey; label: string }[] = [
+  { key: "period", label: "Период" },
+  { key: "carrier_name", label: "Перевозчик" },
+  { key: "truck_label", label: "Машина" },
+  { key: "driver_label", label: "Водитель" },
+  { key: "trips", label: "Рейсов" },
+  { key: "gross", label: "Выручка" },
+  { key: "commission_pct", label: "% ПР" },
+  { key: "commission_rub", label: "Комиссия" },
+  { key: "net", label: "Netto" },
+  { key: "fines", label: "Штрафы" },
+  { key: "toll", label: "Дорога" },
+  { key: "fuel", label: "Топливо" },
+  { key: "driver_pct", label: "% водит." },
+  { key: "driver_payout", label: "Выплата водителю" },
+  { key: "profit", label: "Прибыль" },
+  { key: "profitability", label: "Рентаб." },
+  { key: "price_per_trip", label: "Цена рейса" },
+  { key: "price_per_day", label: "Цена дня" },
+];
+
+function sortValue(r: FlatRow, key: SortKey): string | number {
+  switch (key) {
+    case "period":
+      return r.week_start;
+    case "carrier_name":
+      return r.carrier_name || "—";
+    case "truck_label":
+      return r.truck_label;
+    case "driver_label":
+      return r.driver_label;
+    case "trips":
+      return r.trips;
+    case "gross":
+      return r.gross;
+    case "commission_pct":
+      return r.commission_pct;
+    case "commission_rub":
+      return r.commission_rub;
+    case "net":
+      return r.net;
+    case "fines":
+      return r.fines;
+    case "toll":
+      return r.toll;
+    case "fuel":
+      return r.fuel;
+    case "driver_pct":
+      return r.driver_pct;
+    case "driver_payout":
+      return r.driver_payout;
+    case "profit":
+      return r.profit;
+    case "profitability":
+      return r.profitability ?? -Infinity;
+    case "price_per_trip":
+      return r.price_per_trip;
+    case "price_per_day":
+      return r.price_per_day;
+  }
+}
+
+// Допуск в полкопейки (2026-06-28, фикс): driver_payout приходит с backend
+// "грязным" float (net*pct/100, например 41743.245000000003), а сравнение
+// paid>=payout было строгим - при разнице меньше копейки плашка уходила в
+// жёлтую, хотя округлённый до копеек "Остаток" показывал "0 ₽" (виден баг -
+// плашка жёлтая, в подсказке остаток 0). Сравниваем округлённо.
+const KOPECK = 0.005;
+
+// Бейдж оплаты в колонке "Выплата водителю" (2026-06-28, план "кабинет
+// водителя", п.1 доработка): прозрачный - проводок ещё не было, жёлтая
+// (.st-warn) - сумма проводок меньше расчётной выплаты, зелёная (.st-route) -
+// проведено столько же или больше.
+function settleBadgeClass(paid: number, payout: number): string {
+  if (!paid || paid <= 0) return "";
+  return paid >= payout - KOPECK ? "st-route" : "st-warn";
+}
+
+// Подсказка при наведении на жёлтую плашку (2026-06-28, доработка) - разница
+// между расчётной выплатой (план) и суммой уже проведённых проводок (факт).
+// Для зелёной/прозрачной плашки подсказка не нужна - там либо всё ясно по
+// самой сумме, либо проводок ещё не было.
+function settleBadgeTitle(paid: number, payout: number): string | undefined {
+  if (!paid || paid <= 0 || paid >= payout - KOPECK) return undefined;
+  return `План: ${money(payout)} · Проведено: ${money(paid)} · Остаток: ${money(payout - paid)}`;
+}
+
+function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
+  if (!active) return null;
+  return <Icon name={dir === "asc" ? "arrowup" : "arrowdown"} size={11} />;
+}
+
+export default function Reports() {
+  const navigate = useNavigate();
+  const [data, setData] = useState<WeeklyData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [carrierFilter, setCarrierFilter] = useState<Set<string>>(new Set());
+  const [truckFilter, setTruckFilter] = useState<Set<string>>(new Set());
+  const [driverFilter, setDriverFilter] = useState<Set<string>>(new Set());
+
+  const [sortKey, setSortKey] = useState<SortKey>("period");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+
+  // «Вид» (2026-06-29) — по умолчанию «Полный», как и раньше.
+  const [view, setView] = useState<ReportView>("full");
+
+  // «Провести расчёт» (2026-06-28, план "кабинет водителя", п.3) - сумма,
+  // введённая во всплывающем поле, ложится в реестр расходов отдельной
+  // строкой (категория "Расчёт с водителем", привязка truck_id+driver_id из
+  // строки отчёта, дата = момент нажатия кнопки, а не неделя отчёта - это
+  // фактическая выплата, происходящая сейчас, а не задним числом). Задел
+  // под будущий баланс водителя (см. план) - сама страница баланса в эту
+  // итерацию не строится, только данные.
+  const [settleRow, setSettleRow] = useState<FlatRow | null>(null);
+  const [settleAmount, setSettleAmount] = useState("");
+  const [settleSaving, setSettleSaving] = useState(false);
+  const [settleError, setSettleError] = useState<string | null>(null);
+
+  // По умолчанию — последние 5 недель (задача #137, 2026-06-28), не текущая
+  // неделя: страница "Отчёты" про историю, а не про "сейчас".
+  const [{ dateFrom: initFrom, dateTo: initTo }] = useState(() => lastNWeeksRange(5));
+  const [dateFrom, setDateFrom] = useState(initFrom);
+  const [dateTo, setDateTo] = useState(initTo);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    api
+      .get<WeeklyData>(`/api/dashboard/weekly?date_from=${dateFrom}&date_to=${dateTo}`)
+      .then((result) => {
+        if (!cancelled) setData(result);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof ApiError ? err.message : "Ошибка загрузки");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [dateFrom, dateTo]);
+
+  // Перезапрос /weekly после «Провести расчёт» (2026-06-28, фикс): без этого
+  // только что сохранённая проводка не попадала в driver_paid на экране -
+  // таблица оставалась на данных, загруженных при открытии страницы, и
+  // плашка оплаты в "Выплата водителю" никогда не появлялась, пока не
+  // обновишь страницу руками.
+  async function reloadWeekly() {
+    try {
+      const result = await api.get<WeeklyData>(`/api/dashboard/weekly?date_from=${dateFrom}&date_to=${dateTo}`);
+      setData(result);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Ошибка загрузки");
+    }
+  }
+
+  const flatRows: FlatRow[] = useMemo(
+    () =>
+      data
+        ? data.weeks.flatMap((w) => w.rows.map((r) => ({ ...r, week_start: w.week_start, week_end: w.week_end })))
+        : [],
+    [data]
+  );
+
+  const carrierOptions = useMemo(() => uniqueSorted(flatRows.map((r) => r.carrier_name || "—")), [flatRows]);
+  const truckOptions = useMemo(() => uniqueSorted(flatRows.map((r) => r.truck_label)), [flatRows]);
+  const driverOptions = useMemo(() => uniqueSorted(flatRows.map((r) => r.driver_label)), [flatRows]);
+
+  function resetFilters() {
+    setCarrierFilter(new Set());
+    setTruckFilter(new Set());
+    setDriverFilter(new Set());
+  }
+
+  const filteredRows = useMemo(
+    () =>
+      flatRows.filter(
+        (r) =>
+          (carrierFilter.size === 0 || carrierFilter.has(r.carrier_name || "—")) &&
+          (truckFilter.size === 0 || truckFilter.has(r.truck_label)) &&
+          (driverFilter.size === 0 || driverFilter.has(r.driver_label))
+      ),
+    [flatRows, carrierFilter, truckFilter, driverFilter]
+  );
+
+  const sortedRows = useMemo(() => {
+    const rows = [...filteredRows];
+    rows.sort((a, b) => {
+      const va = sortValue(a, sortKey);
+      const vb = sortValue(b, sortKey);
+      let cmp = typeof va === "string" && typeof vb === "string" ? va.localeCompare(vb, "ru") : (va as number) - (vb as number);
+      // Внутри одинакового значения сортировки — стабильный вторичный порядок
+      // по неделе, чтобы строки не "прыгали" местами между перерисовками.
+      if (cmp === 0) cmp = a.week_start.localeCompare(b.week_start);
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+    return rows;
+  }, [filteredRows, sortKey, sortDir]);
+
+  const totals = useMemo(
+    () =>
+      filteredRows.reduce(
+        (acc, r) => ({
+          trips: acc.trips + r.trips,
+          gross: acc.gross + r.gross,
+          commission_rub: acc.commission_rub + r.commission_rub,
+          net: acc.net + r.net,
+          fines: acc.fines + r.fines,
+          toll: acc.toll + r.toll,
+          fuel: acc.fuel + r.fuel,
+          driver_payout: acc.driver_payout + r.driver_payout,
+          profit: acc.profit + r.profit,
+        }),
+        { trips: 0, gross: 0, commission_rub: 0, net: 0, fines: 0, toll: 0, fuel: 0, driver_payout: 0, profit: 0 }
+      ),
+    [filteredRows]
+  );
+  const totalsProfitability = totals.net ? totals.profit / totals.net : null;
+  const filtersActive = carrierFilter.size > 0 || truckFilter.size > 0 || driverFilter.size > 0;
+  const visibleColumns = view === "driver" ? COLUMNS.filter((c) => !DRIVER_HIDDEN_COLUMNS.has(c.key)) : COLUMNS;
+
+  function toggleSort(key: SortKey) {
+    if (key === sortKey) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  }
+
+  function openSettle(r: FlatRow) {
+    setSettleRow(r);
+    // По умолчанию - полная расчётная сумма (2026-06-28, доработка): обычно
+    // проводят весь driver_payout, поле редактируемое - для частичной выплаты
+    // просто меняют число руками. .toFixed(2) (2026-06-29, фикс) - backend
+    // теперь сам округляет driver_payout (calculations.py::round2), но это
+    // поле подстраховано и на фронтенде, чтобы сюда не просочились "хвосты"
+    // даже если когда-нибудь появится путь, считающий сумму прямо в браузере.
+    setSettleAmount(r.driver_payout.toFixed(2));
+    setSettleError(null);
+  }
+
+  async function handleSettleSave() {
+    if (!settleRow) return;
+    const amount = Number(settleAmount);
+    if (!settleAmount.trim() || Number.isNaN(amount) || amount <= 0) {
+      setSettleError("Укажите сумму (число больше 0)");
+      return;
+    }
+    setSettleSaving(true);
+    setSettleError(null);
+    try {
+      // Дата проводки = понедельник недели отчёта (не "сегодня"!) - иначе
+      // расчёт, проведённый сегодня за прошлую неделю, попадёт в бакет
+      // текущей недели в weekly_pnl (iso_week_monday(c.date)) и плашка
+      // оплаты на нужной строке не появится (баг, найден 2026-06-28: две
+      // проводки задним числом ушли в текущую неделю вместо своих).
+      await api.post("/api/expenses/", {
+        date: settleRow.week_start,
+        status: "ОПЛАЧЕНО",
+        expense: amount,
+        category: "Расчёт с водителем",
+        truck_id: settleRow.truck_id,
+        driver_id: settleRow.driver_id,
+        counterparty: settleRow.driver_label,
+        purpose: `Расчёт по отчёту за неделю ${fmtDate(settleRow.week_start)} – ${fmtDate(settleRow.week_end)}`,
+      });
+      await reloadWeekly();
+      setSettleRow(null);
+    } catch (err) {
+      setSettleError(err instanceof ApiError ? err.message : "Ошибка сохранения");
+    } finally {
+      setSettleSaving(false);
+    }
+  }
+
+  return (
+    <div>
+      <div className="pagehead">
+        <div className="ph-title">
+          <div className="crumbs">
+            <Icon name="grid" size={13} /> Автопарк <Icon name="chevr" size={13} /> Расчёт по неделям
+          </div>
+          <h1 className="pagetitle">Отчёты</h1>
+        </div>
+        <div className="head-actions">
+          <DateRangePicker
+            dateFrom={dateFrom}
+            dateTo={dateTo}
+            onChange={(f, t) => {
+              setDateFrom(f);
+              setDateTo(t);
+            }}
+          />
+        </div>
+      </div>
+
+      {error && (
+        <p className="fcard" style={{ color: "var(--ember)", marginBottom: 16 }}>
+          {error}
+        </p>
+      )}
+
+      <div className="fcard" style={{ marginBottom: 16 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "flex-end" }}>
+          <MultiSelect label="Перевозчик" options={carrierOptions} selected={carrierFilter} onChange={setCarrierFilter} />
+          <MultiSelect label="Машина" options={truckOptions} selected={truckFilter} onChange={setTruckFilter} />
+          <MultiSelect label="Водитель" options={driverOptions} selected={driverFilter} onChange={setDriverFilter} />
+          {filtersActive && (
+            <button type="button" className="btn btn-ghost" style={{ fontSize: 13, padding: "9px 16px" }} onClick={resetFilters}>
+              Сбросить фильтры
+            </button>
+          )}
+          <div className="navpills" style={{ width: "fit-content", marginLeft: "auto" }}>
+            <button
+              type="button"
+              className={"navpill" + (view === "full" ? " active" : "")}
+              style={{ border: "none", background: view === "full" ? undefined : "none", cursor: "pointer", font: "inherit" }}
+              onClick={() => setView("full")}
+            >
+              Полный
+            </button>
+            <button
+              type="button"
+              className={"navpill" + (view === "driver" ? " active" : "")}
+              style={{ border: "none", background: view === "driver" ? undefined : "none", cursor: "pointer", font: "inherit" }}
+              onClick={() => setView("driver")}
+            >
+              Для водителя
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {loading && !data && <SkeletonRows rows={9} />}
+
+      {data && (
+        <>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
+            <span className="badge">
+              <Icon name="calendar" size={14} /> {fmtDate(data.period.date_from)} – {fmtDate(data.period.date_to)}
+            </span>
+            <span style={{ fontSize: 13, color: "var(--ink-3)" }}>
+              {sortedRows.length} из {flatRows.length} строк
+            </span>
+          </div>
+
+          {sortedRows.length === 0 && (
+            <p className="fcard" style={{ color: "var(--ink-3)" }}>
+              Нет данных по выбранным фильтрам.
+            </p>
+          )}
+
+          {sortedRows.length > 0 && (
+            <div className="fcard">
+              <div style={{ overflowX: "auto" }}>
+                <table>
+                  <thead>
+                    <tr>
+                      {visibleColumns.map((c) => (
+                        <th
+                          key={c.key}
+                          className="sortable-th"
+                          onClick={() => toggleSort(c.key)}
+                          title="Сортировать"
+                          style={{ color: sortKey === c.key ? "var(--ink)" : undefined }}
+                        >
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                            {c.label}
+                            <SortIcon active={sortKey === c.key} dir={sortDir} />
+                          </span>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedRows.map((r, i) => (
+                      <tr key={`${r.week_start}-${r.truck_id}-${r.driver_id}-${i}`}>
+                        <td
+                          style={{ cursor: "pointer", color: "var(--iris)", whiteSpace: "nowrap" }}
+                          title="Открыть рейсы за этот период"
+                          onClick={() => {
+                            const p: Record<string, string> = {
+                              from: r.week_start,
+                              to: r.week_end,
+                            };
+                            if (r.driver_label && r.driver_label !== "—") p.driver = r.driver_label;
+                            // truck_plate — гос.номер (truck.plate), а не label: Trips.tsx
+                            // фильтрует рейсы через truckLabel()=truck.plate, поэтому
+                            // передаём plate, иначе переименованные машины не совпадут.
+                            if (r.truck_plate && r.truck_plate !== "—") p.truck = r.truck_plate;
+                            if (r.carrier_name && r.carrier_name !== "—") p.carrier = r.carrier_name;
+                            navigate(`/trips?${new URLSearchParams(p).toString()}`);
+                          }}
+                        >
+                          {fmtDate(r.week_start)} – {fmtDate(r.week_end)}
+                        </td>
+                        <td>{r.carrier_name || "—"}</td>
+                        <td>{r.truck_label}</td>
+                        <td>{r.driver_label}</td>
+                        <td>{r.trips}</td>
+                        {view === "full" && <td>{money(r.gross)}</td>}
+                        {view === "full" && <td>{r.commission_pct.toFixed(0)}%</td>}
+                        {view === "full" && <td>{money(r.commission_rub)}</td>}
+                        <td>{money(r.net)}</td>
+                        <td style={{ color: r.fines ? "var(--bad-ink)" : undefined }}>{money(r.fines)}</td>
+                        <td>{money(r.toll)}</td>
+                        <td>{money(r.fuel)}</td>
+                        <td>{r.driver_pct.toFixed(0)}%</td>
+                        <td>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, width: "100%" }}>
+                            <span
+                              className={`status ${settleBadgeClass(r.driver_paid, r.driver_payout)}`}
+                              title={settleBadgeTitle(r.driver_paid, r.driver_payout)}
+                            >
+                              {money(r.driver_payout)}
+                            </span>
+                            <button
+                              type="button"
+                              className="chip-ic"
+                              title="Зафиксировать выплату водителю"
+                              onClick={() => openSettle(r)}
+                            >
+                              <Icon name="ruble" />
+                            </button>
+                          </div>
+                        </td>
+                        {view === "full" && (
+                          <td style={{ color: r.profit >= 0 ? "var(--good-ink)" : "var(--bad-ink)", fontWeight: 700 }}>
+                            {money(r.profit)}
+                          </td>
+                        )}
+                        {view === "full" && <td>{pct(r.profitability)}</td>}
+                        {view === "full" && <td>{money(r.price_per_trip)}</td>}
+                        {view === "full" && <td title={`${r.work_days} раб. дн.`}>{money(r.price_per_day)}</td>}
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr style={{ fontWeight: 700, background: "var(--surface-2)" }}>
+                      <td>Итого</td>
+                      <td colSpan={3}>{filtersActive ? "по фильтру" : "за весь период"}</td>
+                      <td>{totals.trips}</td>
+                      {view === "full" && <td>{money(totals.gross)}</td>}
+                      {view === "full" && <td>—</td>}
+                      {view === "full" && <td>{money(totals.commission_rub)}</td>}
+                      <td>{money(totals.net)}</td>
+                      <td style={{ color: totals.fines ? "var(--bad-ink)" : undefined }}>{money(totals.fines)}</td>
+                      <td>{money(totals.toll)}</td>
+                      <td>{money(totals.fuel)}</td>
+                      <td>—</td>
+                      <td>{money(totals.driver_payout)}</td>
+                      {view === "full" && (
+                        <td style={{ color: totals.profit >= 0 ? "var(--good-ink)" : "var(--bad-ink)" }}>
+                          {money(totals.profit)}
+                        </td>
+                      )}
+                      {view === "full" && <td>{pct(totalsProfitability)}</td>}
+                      {view === "full" && <td>—</td>}
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {data.notes.length > 0 && (
+            <div className="fcard" style={{ fontSize: "0.82rem", color: "var(--ink-3)", lineHeight: 1.5, marginTop: 16 }}>
+              {data.notes.map((n, i) => (
+                <div key={i} style={{ marginBottom: i < data.notes.length - 1 ? 6 : 0 }}>
+                  ⚠ {n}
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {settleRow && (
+        <div className="modal-overlay" onClick={() => !settleSaving && setSettleRow(null)}>
+          <div className="fcard" style={{ width: 420, maxWidth: "94vw", padding: 0 }} onClick={(e) => e.stopPropagation()}>
+            <div
+              style={{
+                background: "var(--dark)",
+                color: "#fff",
+                padding: "16px 24px",
+                borderRadius: "26px 26px 0 0",
+              }}
+            >
+              <h2 style={{ fontSize: 18, margin: 0 }}>Провести расчёт</h2>
+            </div>
+            <div style={{ padding: 24 }}>
+              <p style={{ color: "var(--ink-3)", fontSize: 13, marginBottom: 16 }}>
+                {settleRow.driver_label} · {settleRow.truck_label} · {fmtDate(settleRow.week_start)} – {fmtDate(settleRow.week_end)}
+                <br />
+                Сумма попадёт в реестр расходов (категория «Расчёт с водителем») с привязкой водитель+машина и датой
+                начала этой недели отчёта.
+              </p>
+              <div style={{ marginBottom: 16 }}>
+                <label className="label">Сумма, ₽</label>
+                <input
+                  type="number"
+                  className="input"
+                  autoFocus
+                  value={settleAmount}
+                  onChange={(e) => setSettleAmount(e.target.value)}
+                />
+              </div>
+              {settleError && <p style={{ color: "var(--ember)", fontSize: 13, margin: "0 0 12px" }}>{settleError}</p>}
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+                <button type="button" className="pill-btn" disabled={settleSaving} onClick={() => setSettleRow(null)}>
+                  Отмена
+                </button>
+                <button type="button" className="pill-btn solid" disabled={settleSaving} onClick={handleSettleSave}>
+                  {settleSaving ? "Сохранение..." : "Сохранить"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

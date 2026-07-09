@@ -1,0 +1,4 @@
+# Зависимости для тестирования (не входят в prod-образ)
+# Установка: pip install -r requirements-test.txt --break-system-packages
+pytest>=7.4
+httpx>=0.24        # нужен для FastAPI TestClient (Starlette >= 0.21)

@@ -1,0 +1,67 @@
+name: transport-crm-staging
+
+# Staging-окружение Transport CRM
+# Порты: frontend → 81, backend → 8001
+# Данные: ./data_staging/ (полностью отдельно от prod)
+#
+# Первый запуск:
+#   docker compose -f docker-compose.staging.yml --env-file .env.staging up -d --build
+#
+# Последующие запуски (без пересборки):
+#   docker compose -f docker-compose.staging.yml --env-file .env.staging up -d
+#
+# Остановка:
+#   docker compose -f docker-compose.staging.yml down
+
+services:
+  backend:
+    build:
+      context: ./backend
+    container_name: crm-staging-backend
+    ports:
+      - "8001:8000"
+    environment:
+      - DATABASE_URL=sqlite:////data/transport_crm.db
+      - ADMIN_PASSWORD=${STAGING_ADMIN_PASSWORD}
+      - JWT_SECRET=${STAGING_JWT_SECRET}
+      - CORS_ORIGINS=http://localhost:81,http://127.0.0.1:81
+      - PHOTOS_DIR=/photos
+      - TRUCK_SCANS_DIR=/truck-scans
+    volumes:
+      - ./data_staging/db:/data
+      - ./data_staging/photos:/photos
+      - ./data_staging/truck_scans:/truck-scans
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: crm-staging-frontend
+    ports:
+      - "81:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  backup:
+    image: alpine:3.20
+    container_name: crm-staging-backup
+    depends_on:
+      - backend
+    volumes:
+      - ./data_staging/db:/data:ro
+      - ./data_staging/backups:/backups
+      - ./scripts/backup.sh:/usr/local/bin/db-backup:ro
+    environment:
+      - KEEP_DAYS=7
+    command:
+      - sh
+      - -c
+      - |
+        apk add --no-cache sqlite >/dev/null 2>&1
+        chmod +x /usr/local/bin/db-backup
+        /usr/local/bin/db-backup || true
+        echo '0 4 * * * /usr/local/bin/db-backup >> /backups/backup.log 2>&1' \
+          > /etc/crontabs/root
+        crond -f -l 8
+    restart: unless-stopped

@@ -1,0 +1,119 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=sqlite:////data/transport_crm.db
+      # ──────────────────────────────────────────────────────────
+      # ADMIN_PASSWORD: пароль администратора.
+      # Задай перед первым запуском — или измени и перезапусти
+      # контейнер, чтобы применить новый пароль к существующей БД.
+      # ОБЯЗАТЕЛЬНО для production. В dev без этой переменной
+      # используется fallback "admin123".
+      # Задаётся в файле .env (не коммитится в git) — как и JWT_SECRET.
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      # ADMIN_USERNAME: логин администратора (по умолчанию "admin").
+      # Раскомментируй и задай, если хочешь другой логин.
+      # - ADMIN_USERNAME=admin
+      # ──────────────────────────────────────────────────────────
+      # JWT_SECRET: секрет для подписи токенов авторизации.
+      # Задаётся в файле .env (не коммитится в git).
+      # Скопируй .env.example → .env и задай своё значение.
+      # Генерация: python -c "import secrets; print(secrets.token_hex(32))"
+      - JWT_SECRET=${JWT_SECRET}
+      # ──────────────────────────────────────────────────────────
+      # CORS_ORIGINS: разрешённые источники для браузерных запросов.
+      # В production замени на реальный домен: https://transport.example.ru
+      # Несколько доменов через запятую: https://a.ru,https://b.ru
+      # По умолчанию (если не задан или "*") — любой источник (небезопасно для prod).
+      - CORS_ORIGINS=${CORS_ORIGINS:-*}
+      # ──────────────────────────────────────────────────────────
+      # PHOTOS_DIR: папка фото приёмки-передачи авто (2026-07-02).
+      # В prod смонтирован как Docker volume ./data/photos:/photos.
+      - PHOTOS_DIR=/photos
+      # TRUCK_SCANS_DIR: сканы документов машин (2026-07-03).
+      - TRUCK_SCANS_DIR=/truck-scans
+    volumes:
+      - ./data/db:/data              # БД — исходники зашиты в образ
+      - ./data/photos:/photos        # фото приёмки-передачи авто
+      - ./data/truck_scans:/truck-scans  # сканы документов машин
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    # Примечание: volumes с исходниками убраны — frontend теперь собирается
+    # в образ (npm run build → nginx). Горячая перезагрузка в prod не нужна.
+    # Для разработки используй: docker compose -f docker-compose.dev.yml up
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # ОПЦИОНАЛЬНО: PostgreSQL вместо SQLite
+  # ──────────────────────────────────────────────────────────────────────────
+  # 1. Раскомментируй сервис `db` ниже.
+  # 2. В сервисе `backend` замени строку DATABASE_URL на PostgreSQL-вариант:
+  #      - DATABASE_URL=postgresql+psycopg2://crm:STRONG_PASSWORD@db:5432/transport_crm
+  #    (не забудь совпадение пароля с POSTGRES_PASSWORD в `db`)
+  # 3. Удали строку с sqlite-путём:
+  #      - DATABASE_URL=sqlite:////data/transport_crm.db
+  # 4. ВНИМАНИЕ: SQLite и PostgreSQL не совместимы по данным.
+  #    Перед переходом сделай резервную копию SQLite-БД, затем запусти
+  #    alembic upgrade head на новой PostgreSQL-БД — она создаст пустую схему
+  #    (таблицы через init_db). Данные нужно перенести вручную или через
+  #    специальную утилиту (pg_restore, pgloader и т.п.).
+  # ──────────────────────────────────────────────────────────────────────────
+  # db:
+  #   image: postgres:16-alpine
+  #   environment:
+  #     - POSTGRES_DB=transport_crm
+  #     - POSTGRES_USER=crm
+  #     - POSTGRES_PASSWORD=STRONG_PASSWORD    # совпадает с DATABASE_URL выше
+  #   volumes:
+  #     - ./data/pg:/var/lib/postgresql/data   # персистентные данные PostgreSQL
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U crm -d transport_crm"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+  # ══════════════════════════════════════════════════════════════════════════
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Сервис резервного копирования БД.
+  # Запускает backup.sh сразу при старте, затем — ежедневно в 03:00 UTC.
+  # Бэкапы хранятся в ./data/backups/, ротация: последние KEEP_DAYS=7 дней.
+  #
+  # Ручной запуск бэкапа:
+  #   docker compose exec backup db-backup
+  # Просмотр лога:
+  #   docker compose logs backup
+  # ──────────────────────────────────────────────────────────────────────────
+  backup:
+    image: alpine:3.20
+    depends_on:
+      - backend
+    volumes:
+      - ./data/db:/data:ro              # live-БД — только чтение
+      - ./data/backups:/backups         # выходная папка бэкапов
+      - ./scripts/backup.sh:/usr/local/bin/db-backup:ro
+    environment:
+      - KEEP_DAYS=7
+    command:
+      - sh
+      - -c
+      - |
+        apk add --no-cache sqlite >/dev/null 2>&1
+        chmod +x /usr/local/bin/db-backup
+        # Бэкап сразу при запуске контейнера
+        /usr/local/bin/db-backup || true
+        # Ежедневный бэкап в 03:00 UTC; лог пишется в ./data/backups/backup.log
+        echo '0 3 * * * /usr/local/bin/db-backup >> /backups/backup.log 2>&1' \
+          > /etc/crontabs/root
+        crond -f -l 8
+    restart: unless-stopped

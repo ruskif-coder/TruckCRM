@@ -1,0 +1,28 @@
+node_modules/
+dist/
+__pycache__/
+*.pyc
+.venv/
+*.db
+*.tmp.*
+
+# Секреты — не коммитить
+.env
+.env.staging
+
+# Данные runtime — не коммитить (БД, фото, сканы документов, бэкапы)
+data/
+data_staging/
+
+# Логи деплоя
+logs/
+
+# Артефакты сборки Vite и TypeScript
+vite.config.ts.timestamp-*.mjs
+frontend/vite.config.ts.timestamp-*.mjs
+frontend/tsconfig.tsbuildinfo
+
+# Рабочие bat-скрипты (содержат пути/настройки окружения)
+crm.bat
+deploy.bat
+start_docker.bat

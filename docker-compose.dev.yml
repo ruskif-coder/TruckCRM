@@ -1,0 +1,31 @@
+# Оверлей для локальной разработки (горячая перезагрузка кода).
+# Использование:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#
+# Что меняет относительно docker-compose.yml:
+#   - backend: монтирует ./backend:/app (код живёт на хосте) + --reload
+#   - frontend: заменяет nginx-образ на Vite dev-сервер (порт 5173)
+#   - CORS_ORIGINS: разрешает localhost:5173
+services:
+  backend:
+    volumes:
+      - ./backend:/app      # исходники с хоста для hot-reload
+      - ./data/db:/data
+    environment:
+      - CORS_ORIGINS=http://localhost:5173
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+
+volumes:
+  frontend_node_modules:

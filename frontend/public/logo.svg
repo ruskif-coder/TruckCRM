@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background -->
+  <rect width="512" height="512" rx="112" fill="#2B4E7B"/>
+
+  <!-- Flatbed/chassis horizontal bar -->
+  <rect x="74" y="295" width="318" height="30" rx="7" fill="#D6D6D6"/>
+
+  <!-- Left rear strut -->
+  <rect x="78" y="272" width="12" height="25" rx="3" fill="#C0C0C0"/>
+
+  <!-- Fuel tank / step box -->
+  <rect x="278" y="295" width="46" height="22" rx="5" fill="#C8C8C8"/>
+
+  <!-- Cab body -->
+  <path d="M344 208 Q344 204 348 202 L460 202 Q468 202 468 210 L468 325 L344 325 Z" fill="#E2E2E2"/>
+
+  <!-- Cab windshield (dark glass) -->
+  <rect x="352" y="210" width="108" height="72" rx="5" fill="#1B3757"/>
+
+  <!-- Cab lower panel / grill stripe -->
+  <rect x="352" y="288" width="108" height="14" rx="2" fill="#C4C4C4"/>
+
+  <!-- Cab door divider line -->
+  <rect x="352" y="302" width="2" height="23" fill="#B8B8B8"/>
+
+  <!-- Rear wheel (large dark) -->
+  <circle cx="152" cy="360" r="56" fill="#303030"/>
+  <circle cx="152" cy="360" r="25" fill="#868686"/>
+
+  <!-- Front wheel (large dark) -->
+  <circle cx="428" cy="360" r="56" fill="#303030"/>
+  <circle cx="428" cy="360" r="25" fill="#868686"/>
+</svg>
