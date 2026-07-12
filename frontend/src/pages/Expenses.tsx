@@ -374,6 +374,8 @@ export default function Expenses() {
   // Статьи расходов: загружаются из API /api/expense-categories/ (#145)
   const [categories, setCategories] = useState<string[]>(CATEGORIES);
   const [counterparties, setCounterparties] = useState<Counterparty[]>([]);
+  // Суммарный долг перед перевозчиками (balance > 0 → мы должны)
+  const [carrierDebt, setCarrierDebt] = useState<number>(0);
 
   // Журнал заявок на компенсацию (вкладка «Заявки», 2026-07-04)
   type CompRow = {
@@ -428,12 +430,13 @@ export default function Expenses() {
     setError(null);
     try {
       type ExpCat = { id: number; name: string; active: boolean };
-      const [e, tr, dr, cats, cps] = await Promise.all([
+      const [e, tr, dr, cats, cps, bal] = await Promise.all([
         api.get<CashFlowEntry[]>("/api/expenses/"),
         api.get<Truck[]>("/api/trucks/"),
         api.get<Driver[]>("/api/drivers/"),
         api.get<ExpCat[]>("/api/expense-categories/").catch(() => [] as ExpCat[]),
         api.get<Counterparty[]>("/api/counterparties/").catch(() => [] as Counterparty[]),
+        api.get<{ balance: number }[]>("/api/carriers/balance/").catch(() => [] as { balance: number }[]),
       ]);
       setEntries(e);
       setTrucks(tr);
@@ -441,6 +444,8 @@ export default function Expenses() {
       const names = cats.filter(c => c.active).map(c => c.name);
       if (names.length > 0) setCategories(names);
       setCounterparties(cps);
+      // Долг = сумма положительных балансов (balance > 0 означает «мы должны перевозчику»)
+      setCarrierDebt(bal.filter(r => r.balance > 0).reduce((s, r) => s + r.balance, 0));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Ошибка загрузки");
     } finally {
@@ -712,7 +717,7 @@ export default function Expenses() {
           <div className="crumbs">
             <Icon name="grid" size={13} /> Автопарк <Icon name="chevr" size={13} /> Финансы
           </div>
-          <h1 className="pagetitle">Расходы</h1>
+          <h1 className="pagetitle">Финансы</h1>
         </div>
       </div>
 
@@ -1085,8 +1090,10 @@ export default function Expenses() {
 
       <div style={{ display: "flex", gap: 16, marginBottom: 16 }}>
         <div className="fcard" style={{ flex: 1 }}>
-          <p style={{ fontSize: 12, color: "var(--smoke)", margin: "0 0 4px" }}>Операций в выборке</p>
-          <p style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{filtered.length}</p>
+          <p style={{ fontSize: 12, color: "var(--smoke)", margin: "0 0 4px" }}>Долг перевозчикам</p>
+          <p style={{ fontSize: 22, fontWeight: 600, margin: 0, color: carrierDebt > 0 ? "var(--ember,#e04)" : undefined }}>
+            {money(carrierDebt)}
+          </p>
         </div>
         <div className="fcard" style={{ flex: 1 }}>
           <p style={{ fontSize: 12, color: "var(--smoke)", margin: "0 0 4px" }}>Поступления</p>
@@ -1098,7 +1105,7 @@ export default function Expenses() {
         </div>
         <div className="fcard" style={{ flex: 1 }}>
           <p style={{ fontSize: 12, color: "var(--smoke)", margin: "0 0 4px" }}>Сальдо</p>
-          <p style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{money(totalIncome - totalExpense)}</p>
+          <p style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{money(totalIncome - totalExpense - carrierDebt)}</p>
         </div>
       </div>
 

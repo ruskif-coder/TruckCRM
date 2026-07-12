@@ -38,7 +38,7 @@ const NAV: { to: string; label: string; icon: IconName; roles?: string[]; zones?
   { to: "/reports", label: "Отчёты", icon: "list", roles: ["admin", "manager", "accountant"] },
   { to: "/directory", label: "Справочники", icon: "folder", zones: ["trucks", "drivers"] },
   { to: "/trips", label: "Рейсы", icon: "route", zones: ["trips"] },
-  { to: "/expenses", label: "Расходы", icon: "doc", zones: ["expenses"] },
+  { to: "/expenses", label: "Финансы", icon: "doc", zones: ["expenses"] },
   { to: "/repairs", label: "Ремонт", icon: "wrench", zones: ["repair_requests"] },
   { to: "/settings", label: "Настройки", icon: "cog", roles: ["admin"] },
 ];
