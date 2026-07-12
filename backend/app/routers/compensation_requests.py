@@ -59,6 +59,7 @@ def compensation_journal(
     if user.role == "driver":
         rows = [r for r in rows if r.driver_id == user.driver_id]
 
+    users = {u.id: (u.full_name or u.username) for u in session.exec(select(models.User)).all()}
     result = []
     for r in rows:
         driver = session.get(models.Driver, r.driver_id) if r.driver_id else None
@@ -67,6 +68,7 @@ def compensation_journal(
             **r.model_dump(),
             "driver_name": driver.name if driver else "—",
             "truck_label": truck.plate if truck else "—",
+            "approved_by_username": users.get(r.approved_by_user_id) if r.approved_by_user_id else None,
         })
     return result
 
@@ -132,6 +134,7 @@ def approve_request(
         raise HTTPException(status_code=409, detail=f"Заявка уже обработана: {req.status}")
 
     req.status = _APPROVED
+    req.approved_by_user_id = user.id
     session.add(req)
 
     # Документальная запись в реестре расходов
@@ -148,6 +151,7 @@ def approve_request(
         bank="",
         counterparty="",
         period=req.expense_date.strftime("%m-%Y"),
+        created_by_user_id=user.id,  # согласовавший = «кто внёс»
     )
     session.add(entry)
 

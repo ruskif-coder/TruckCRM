@@ -3,7 +3,6 @@ import type { CSSProperties, ReactNode } from "react";
 import { api, ApiError } from "../api";
 import Icon from "../components/Icon";
 import { useAuth } from "../auth/AuthContext";
-import { APP_VERSION } from "../version";
 import { useTheme } from "../theme/ThemeContext";
 import { UsersTable } from "./Users";
 
@@ -12,7 +11,7 @@ import { UsersTable } from "./Users";
 // перенесены в Справочники 2026-06-28 («перенеси перевозчики из настроек в
 // справочники») — логически это справочник наравне с Автомобили/Водители,
 // не настройка (см. Directories.tsx).
-type TabId = "profile" | "users" | "roles" | "log" | "categories";
+type TabId = "profile" | "users" | "roles" | "log" | "categories" | "counterparties";
 const BASE_TABS: { id: TabId; label: string }[] = [
   { id: "profile", label: "Профиль" },
 ];
@@ -39,11 +38,15 @@ const LOG_TAB: { id: TabId; label: string } = { id: "log", label: "Журнал"
 // «Статьи расходов» (2026-07-04) — справочник статей ExpenseCategory с
 // настройкой доступа по ролям. Только для admin (бэкенд гейтит POST/PUT/DELETE).
 const CATEGORIES_TAB: { id: TabId; label: string } = { id: "categories", label: "Статьи" };
+// «Контрагенты» (2026-07-12) — справочник контрагентов (Название, ИНН, НДС%).
+// Только для admin — GET /api/counterparties/ открыт всем залогиненным, но
+// редактирование (POST/PUT/DELETE) гейтится require_role("admin") на бэкенде.
+const COUNTERPARTIES_TAB: { id: TabId; label: string } = { id: "counterparties", label: "Контрагенты" };
 
 export default function Settings() {
   const { user } = useAuth();
   const [tab, setTab] = useState<TabId>("profile");
-  const tabs = user?.role === "admin" ? [...BASE_TABS, USERS_TAB, ROLES_TAB, LOG_TAB, CATEGORIES_TAB] : BASE_TABS;
+  const tabs = user?.role === "admin" ? [...BASE_TABS, USERS_TAB, ROLES_TAB, LOG_TAB, CATEGORIES_TAB, COUNTERPARTIES_TAB] : BASE_TABS;
 
   // 2026-06-28 («выровнять вкладки и кнопки в одну строку») - переключатель
   // вкладок передаётся вниз каждой вкладке как tabsNav, а не рисуется здесь
@@ -82,6 +85,7 @@ export default function Settings() {
         {tab === "roles" && user?.role === "admin" && <RolesTab tabsNav={tabsNav} />}
         {tab === "log" && user?.role === "admin" && <LogTab tabsNav={tabsNav} />}
         {tab === "categories" && user?.role === "admin" && <CategoriesTab tabsNav={tabsNav} />}
+        {tab === "counterparties" && user?.role === "admin" && <CounterpartiesTab tabsNav={tabsNav} />}
       </div>
     </div>
   );
@@ -130,16 +134,6 @@ function ProfileTab({ tabsNav }: { tabsNav?: ReactNode }) {
           Тёмная
         </button>
       </div>
-
-      <SectionLabel>О системе</SectionLabel>
-      <Row>
-        <div style={{ flex: 1 }}>
-          <div className="label">Версия</div>
-          <div style={{ fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
-            v{APP_VERSION}
-          </div>
-        </div>
-      </Row>
       </div>
     </div>
   );
@@ -767,6 +761,229 @@ function CategoriesTab({ tabsNav }: { tabsNav?: ReactNode }) {
           <p style={{ fontSize: 12, color: "var(--smoke)", padding: "8px 14px", margin: 0 }}>
             Перетащите строку за ⠿ чтобы изменить порядок. Двойной клик по названию — изменить. Все изменения сохраняются мгновенно.
           </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Контрагенты (2026-07-12) ──────────────────────────────────────────────
+// CRUD для справочника контрагентов: Название, ИНН, НДС%. Только admin.
+type Counterparty = { id: number; name: string; inn: string; vat_rate: number };
+
+function CounterpartiesTab({ tabsNav }: { tabsNav?: ReactNode }) {
+  const [items, setItems] = useState<Counterparty[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Форма добавления
+  const [addName, setAddName] = useState("");
+  const [addInn, setAddInn] = useState("");
+  const [addVat, setAddVat] = useState("");
+  const [addSaving, setAddSaving] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
+
+  // Инлайн-редактирование
+  const [editId, setEditId] = useState<number | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editInn, setEditInn] = useState("");
+  const [editVat, setEditVat] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+
+  async function load() {
+    setLoading(true); setError(null);
+    try { setItems(await api.get<Counterparty[]>("/api/counterparties/")); }
+    catch { setError("Ошибка загрузки"); }
+    finally { setLoading(false); }
+  }
+
+  useEffect(() => { load(); }, []);
+
+  function startEdit(c: Counterparty) {
+    setEditId(c.id);
+    setEditName(c.name);
+    setEditInn(c.inn || "");
+    setEditVat(c.vat_rate != null ? String(c.vat_rate) : "0");
+  }
+
+  async function saveEdit() {
+    if (!editId) return;
+    setEditSaving(true);
+    try {
+      await api.put(`/api/counterparties/${editId}`, {
+        name: editName.trim() || undefined,
+        inn: editInn,
+        vat_rate: Number(editVat) || 0,
+      });
+      setEditId(null);
+      await load();
+    } catch { /* тихий провал */ }
+    finally { setEditSaving(false); }
+  }
+
+  async function handleAdd() {
+    if (!addName.trim()) { setAddError("Введите название"); return; }
+    setAddSaving(true); setAddError(null);
+    try {
+      await api.post("/api/counterparties/", {
+        name: addName.trim(),
+        inn: addInn,
+        vat_rate: Number(addVat) || 0,
+      });
+      setAddName(""); setAddInn(""); setAddVat("");
+      await load();
+    } catch (e) { setAddError(e instanceof ApiError ? e.message : "Ошибка"); }
+    finally { setAddSaving(false); }
+  }
+
+  async function handleDelete(id: number, name: string) {
+    if (!window.confirm(`Удалить контрагента «${name}»?`)) return;
+    try {
+      await api.delete(`/api/counterparties/${id}`);
+      await load();
+    } catch { /* тихий провал */ }
+  }
+
+  const thC: CSSProperties = {
+    padding: "10px 14px", textAlign: "left", fontSize: 12, fontWeight: 600,
+    color: "var(--smoke)", background: "var(--bg, #f5f5f9)",
+    borderBottom: "1px solid var(--border, #ebebef)", whiteSpace: "nowrap",
+  };
+  const tdC: CSSProperties = {
+    padding: "8px 14px", fontSize: 13,
+    borderBottom: "1px solid var(--border, #ebebef)", verticalAlign: "middle",
+  };
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+        {tabsNav}
+      </div>
+
+      {/* Форма добавления */}
+      <div style={{ marginBottom: addError ? 4 : 16, display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>
+        <div>
+          <label className="label">Название</label>
+          <input
+            className="input"
+            value={addName}
+            onChange={e => { setAddName(e.target.value); setAddError(null); }}
+            placeholder="ООО Ромашка..."
+            onKeyDown={e => e.key === "Enter" && handleAdd()}
+            style={{ minWidth: 240 }}
+          />
+        </div>
+        <div>
+          <label className="label">ИНН</label>
+          <input
+            className="input"
+            value={addInn}
+            onChange={e => setAddInn(e.target.value)}
+            placeholder="7700000000"
+            style={{ minWidth: 140 }}
+          />
+        </div>
+        <div>
+          <label className="label">НДС, %</label>
+          <input
+            className="input"
+            type="number"
+            value={addVat}
+            onChange={e => setAddVat(e.target.value)}
+            placeholder="0"
+            style={{ minWidth: 80 }}
+          />
+        </div>
+        <button className="pill-btn solid" onClick={handleAdd} disabled={addSaving} style={{ flexShrink: 0, whiteSpace: "nowrap" }}>
+          {addSaving ? "..." : "+ Добавить"}
+        </button>
+      </div>
+      {addError && <p style={{ color: "var(--ember)", fontSize: 12, margin: "0 0 12px" }}>{addError}</p>}
+
+      {error && <p style={{ color: "var(--ember)", marginBottom: 12 }}>{error}</p>}
+
+      {loading ? (
+        <div className="fcard" style={{ textAlign: "center", color: "var(--smoke)", padding: "32px 0" }}>Загрузка...</div>
+      ) : items.length === 0 ? (
+        <div className="fcard" style={{ textAlign: "center", color: "var(--smoke)", padding: "32px 0" }}>Контрагентов пока нет. Добавьте первого выше.</div>
+      ) : (
+        <div className="fcard" style={{ padding: 0, overflow: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                <th style={thC}>Название</th>
+                <th style={thC}>ИНН</th>
+                <th style={{ ...thC, textAlign: "right" }}>НДС, %</th>
+                <th style={{ ...thC, width: 80 }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map(c => (
+                <tr key={c.id}>
+                  {editId === c.id ? (
+                    <>
+                      <td style={tdC}>
+                        <input
+                          className="input"
+                          value={editName}
+                          onChange={e => setEditName(e.target.value)}
+                          style={{ width: "100%", minWidth: 160 }}
+                          autoFocus
+                        />
+                      </td>
+                      <td style={tdC}>
+                        <input
+                          className="input"
+                          value={editInn}
+                          onChange={e => setEditInn(e.target.value)}
+                          style={{ width: "100%", minWidth: 120 }}
+                        />
+                      </td>
+                      <td style={{ ...tdC, textAlign: "right" }}>
+                        <input
+                          className="input"
+                          type="number"
+                          value={editVat}
+                          onChange={e => setEditVat(e.target.value)}
+                          style={{ width: 80, textAlign: "right" }}
+                        />
+                      </td>
+                      <td style={{ ...tdC, whiteSpace: "nowrap" }}>
+                        <button className="pill-btn solid" onClick={saveEdit} disabled={editSaving} style={{ fontSize: 12, padding: "4px 10px", marginRight: 4 }}>
+                          {editSaving ? "..." : "✓"}
+                        </button>
+                        <button className="pill-btn" onClick={() => setEditId(null)} style={{ fontSize: 12, padding: "4px 10px" }}>✕</button>
+                      </td>
+                    </>
+                  ) : (
+                    <>
+                      <td style={tdC}>{c.name}</td>
+                      <td style={{ ...tdC, color: "var(--smoke)" }}>{c.inn || "—"}</td>
+                      <td style={{ ...tdC, textAlign: "right" }}>{c.vat_rate != null && c.vat_rate > 0 ? `${c.vat_rate}%` : "—"}</td>
+                      <td style={{ ...tdC, whiteSpace: "nowrap" }}>
+                        <button
+                          className="pill-btn"
+                          onClick={() => startEdit(c)}
+                          style={{ fontSize: 12, padding: "4px 10px", marginRight: 4 }}
+                          title="Редактировать"
+                        >
+                          ✎
+                        </button>
+                        <button
+                          className="pill-btn"
+                          onClick={() => handleDelete(c.id, c.name)}
+                          style={{ fontSize: 12, padding: "4px 10px", color: "var(--ember)" }}
+                          title="Удалить"
+                        >
+                          ✕
+                        </button>
+                      </td>
+                    </>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

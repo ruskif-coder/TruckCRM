@@ -40,6 +40,8 @@ type CashFlowEntry = {
   category: string;
   counterparty: string;
   purpose: string;
+  // Added 2026-07-12: кто внёс запись (имя пользователя или null для старых записей)
+  created_by_username: string | null;
 };
 
 type Truck = { id: number; label: string; plate?: string };
@@ -147,7 +149,7 @@ function toPayload(f: EntryFormState) {
 
 type SortKey =
   | "date" | "status" | "income" | "expense" | "bank" | "period" | "vat_pct" | "vat_amount"
-  | "truck" | "driver" | "category" | "counterparty" | "purpose";
+  | "truck" | "driver" | "category" | "counterparty" | "purpose" | "created_by_username";
 
 type BulkField<T> = { enabled: boolean; value: T };
 type BulkFormState = {
@@ -214,7 +216,8 @@ export default function Expenses() {
   const [dateTo, setDateTo] = useState(() => isoDate(new Date()));
 
   const [bankFilter, setBankFilter] = useState<Set<string>>(new Set());
-  const [periodFilter, setPeriodFilter] = useState<Set<string>>(new Set());
+  // Период — единственный выбранный месяц в формате "MM-YYYY" (пустая строка = все)
+  const [periodFilter, setPeriodFilter] = useState<string>("");
   const [truckFilter, setTruckFilter] = useState<Set<string>>(new Set());
   const [driverFilter, setDriverFilter] = useState<Set<string>>(new Set());
   const [categoryFilter, setCategoryFilter] = useState<Set<string>>(new Set());
@@ -253,6 +256,7 @@ export default function Expenses() {
     description: string; photo_paths: string; status: string;
     reject_reason: string; created_at: string;
     driver_name: string; truck_label: string;
+    approved_by_username: string | null;
   };
   const [compList, setCompList] = useState<CompRow[]>([]);
   const [compLoading, setCompLoading] = useState(false);
@@ -504,7 +508,6 @@ export default function Expenses() {
   }
 
   const bankOptions = uniqueSorted(entries.map((e) => e.bank).filter(Boolean));
-  const periodOptions = uniqueSorted(entries.map((e) => e.period).filter(Boolean));
   const truckOptions = uniqueSorted(entries.map(truckLabel).filter((v) => v !== "—"));
   const driverOptions = uniqueSorted(entries.map(driverLabel).filter((v) => v !== "—"));
   const categoryOptions = uniqueSorted(entries.map((e) => e.category).filter(Boolean));
@@ -514,7 +517,7 @@ export default function Expenses() {
     if (dateFrom && day < dateFrom) return false;
     if (dateTo && day > dateTo) return false;
     if (bankFilter.size > 0 && !bankFilter.has(e.bank)) return false;
-    if (periodFilter.size > 0 && !periodFilter.has(e.period)) return false;
+    if (periodFilter && e.period !== periodFilter) return false;
     if (truckFilter.size > 0 && !truckFilter.has(truckLabel(e))) return false;
     if (driverFilter.size > 0 && !driverFilter.has(driverLabel(e))) return false;
     if (categoryFilter.size > 0 && !categoryFilter.has(e.category)) return false;
@@ -524,7 +527,8 @@ export default function Expenses() {
   function valueOf(e: CashFlowEntry, key: SortKey): string | number {
     if (key === "truck") return truckLabel(e);
     if (key === "driver") return driverLabel(e);
-    return e[key] ?? "";
+    if (key === "created_by_username") return e.created_by_username ?? "";
+    return (e as Record<string, unknown>)[key] as string | number ?? "";
   }
 
   const sorted = [...filtered].sort((a, b) => {
@@ -617,6 +621,7 @@ export default function Expenses() {
                     <th style={thStyle}>Описание</th>
                     <th style={thStyle}>Фото</th>
                     <th style={thStyle}>Статус</th>
+                    <th style={thStyle}>Согласовал</th>
                     <th style={thStyle}>Действия</th>
                   </tr>
                 </thead>
@@ -653,6 +658,9 @@ export default function Expenses() {
                           {row.status === "отказано" && row.reject_reason && (
                             <div style={{ fontSize: 11, color: "var(--smoke)", marginTop: 2 }}>{row.reject_reason}</div>
                           )}
+                        </td>
+                        <td style={{ ...tdStyle, fontSize: 12, color: "var(--smoke)" }}>
+                          {row.approved_by_username || "—"}
                         </td>
                         <td style={tdStyle}>
                           {row.status === "на рассмотрении" && (
@@ -860,15 +868,40 @@ export default function Expenses() {
               setPage(1);
             }}
           />
-          <MultiSelect
-            label="Период"
-            options={periodOptions}
-            selected={periodFilter}
-            onChange={(s) => {
-              setPeriodFilter(s);
-              setPage(1);
-            }}
-          />
+          <div>
+            <label className="label">Период</label>
+            <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+              <input
+                type="month"
+                className="input"
+                style={{ minWidth: 140 }}
+                value={
+                  // period хранится "MM-YYYY", input[type=month] ожидает "YYYY-MM"
+                  periodFilter
+                    ? `${periodFilter.slice(3)}-${periodFilter.slice(0, 2)}`
+                    : ""
+                }
+                onChange={(e) => {
+                  if (e.target.value) {
+                    const [y, m] = e.target.value.split("-");
+                    setPeriodFilter(`${m}-${y}`);
+                  } else {
+                    setPeriodFilter("");
+                  }
+                  setPage(1);
+                }}
+              />
+              {periodFilter && (
+                <button
+                  title="Сбросить фильтр периода"
+                  style={{ ...iconBtnStyle, fontSize: 18, color: "var(--smoke)" }}
+                  onClick={() => { setPeriodFilter(""); setPage(1); }}
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          </div>
           <MultiSelect
             label="Машина"
             options={truckOptions}
@@ -988,6 +1021,7 @@ export default function Expenses() {
                     <Th label="Статья" sortKeyName="category" />
                     <Th label="Контрагент" sortKeyName="counterparty" />
                     <Th label="Назначение" sortKeyName="purpose" />
+                    <Th label="Кто внёс" sortKeyName="created_by_username" />
                   </tr>
                 </thead>
                 <tbody>
@@ -1024,6 +1058,13 @@ export default function Expenses() {
                       <td>{e.category || "—"}</td>
                       <td>{e.counterparty || "—"}</td>
                       <td>{e.purpose || "—"}</td>
+                      <td style={{ whiteSpace: "nowrap", color: "var(--smoke)", fontSize: 12 }}>
+                        {e.created_by_username
+                          ? (e.purpose?.startsWith("Компенсация")
+                            ? `✓ ${e.created_by_username}`
+                            : e.created_by_username)
+                          : "—"}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

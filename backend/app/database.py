@@ -107,10 +107,12 @@ _PENDING_COLUMNS: dict[str, list[tuple[str, str, str]]] = {
     # ALTER TABLE treatment as the others above.
     "cashflowentry": [
         ("fuel_source_key", "VARCHAR", "''"),
-        # Added 2026-07-09: кабинет бригадира — кто создал запись расхода.
+        # Added 2026-07-12 — кто внёс запись в реестр расходов.
         ("created_by_user_id", "INTEGER", "NULL"),
-        # Added 2026-07-09: фото чеков (JSON-список имён файлов).
-        ("photo_paths", "VARCHAR", "''"),
+    ],
+    # Added 2026-07-12 — кто согласовал заявку на компенсацию.
+    "compensationrequest": [
+        ("approved_by_user_id", "INTEGER", "NULL"),
     ],
     # Added 2026-06-29 for the "Пробеги" tab (см. models.MileageLogBase.driver_id,
     # own_filter_field в main.py) - таблица mileagelog уже существовала

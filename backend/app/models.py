@@ -566,13 +566,9 @@ class CashFlowEntryBase(SQLModel):
     # дубли, и не трогает status/vat_pct/counterparty/purpose, если бухгалтер
     # их уже отредактировал вручную.
     fuel_source_key: str = ""
-    # 2026-07-09: кабинет бригадира — расходы от имени бригадира.
-    # Пустая строка у строк, созданных до этого поля (NULL → None в Pydantic).
-    # Заполняется автоматически в routers/cash_flow.py::create_entry из JWT.
-    created_by_user_id: Optional[int] = None
-    # 2026-07-09: фото чеков, приложенных бригадиром (JSON-список имён файлов).
-    # Хранятся в PHOTOS_DIR (/photos/ в Docker), отдаются через /photos/<filename>.
-    photo_paths: str = ""
+    # Added 2026-07-12: кто внёс запись в реестр расходов (user.id).
+    # Для записей, созданных при согласовании компенсации — id согласовавшего.
+    created_by_user_id: Optional[int] = Field(default=None, foreign_key="user.id")
 
 
 class CashFlowEntry(CashFlowEntryBase, table=True):
@@ -598,7 +594,6 @@ class CashFlowEntryUpdate(SQLModel):
     counterparty: Optional[str] = None
     purpose: Optional[str] = None
     fuel_source_key: Optional[str] = None
-    photo_paths: Optional[str] = None
 
 
 class CashFlowBulkUpdate(SQLModel):
@@ -882,6 +877,8 @@ class CompensationRequest(SQLModel, table=True):
     status: str = "на рассмотрении"        # на рассмотрении / принято / отказано
     reject_reason: str = Field(default="")
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    # Added 2026-07-12: кто согласовал заявку (user.id admin/foreman/accountant)
+    approved_by_user_id: Optional[int] = Field(default=None, foreign_key="user.id")
 
 
 class CompensationRequestCreate(SQLModel):
@@ -1078,3 +1075,29 @@ class DriverTransactionCreate(SQLModel):
     tx_type: str
     amount: float  # всегда > 0; сервер негатирует для debit-типов
     description: str = ""
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Контрагенты (2026-07-12)
+# Справочник контрагентов — доступен в Настройках → «Контрагенты» (admin).
+# Используется в реестре расходов как выпадающий список вместо свободного
+# текстового поля «Контрагент».
+# ══════════════════════════════════════════════════════════════════════════════
+class CounterpartyBase(SQLModel):
+    name: str
+    inn: str = ""        # ИНН — plain text, без валидации
+    vat_rate: float = 0  # НДС, %
+
+
+class Counterparty(CounterpartyBase, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+
+class CounterpartyCreate(CounterpartyBase):
+    pass
+
+
+class CounterpartyUpdate(SQLModel):
+    name: Optional[str] = None
+    inn: Optional[str] = None
+    vat_rate: Optional[float] = None

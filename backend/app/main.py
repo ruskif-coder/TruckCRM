@@ -34,6 +34,7 @@ from .routers import vehicle_inspections as vehicle_inspections_router
 from .routers import trip_batches, trips as trips_router, trucks as trucks_router, users as users_router
 from .routers import maintenance as maintenance_router
 from .routers import driver_transactions as driver_transactions_router
+from .routers import counterparties as counterparties_router
 
 protected = [Depends(get_current_user)]
 
@@ -154,7 +155,6 @@ app.include_router(dashboard.router, dependencies=protected)
 app.include_router(settings_router.router, dependencies=protected)
 app.include_router(role_permissions_router.router, dependencies=protected)
 app.include_router(audit_log_router.router, dependencies=protected)
-app.include_router(audit_log_router.download_router, dependencies=protected)
 # Дашборд водителя (мобильный, 2026-06-30): заявки на ремонт + быстрый
 # ввод расхода + баланс/рейсы за неделю. Auth-only (не zone-gated),
 # работает только с данными самого вошедшего пользователя.
@@ -187,6 +187,9 @@ app.include_router(maintenance_router.router, dependencies=protected)
 # Журнал транзакций водителя (2026-07-05): корректировки баланса (компенсации,
 # штрафы, авансы). Auth-only — водитель видит только свои, staff — по driver_id.
 app.include_router(driver_transactions_router.router, dependencies=protected)
+# Реестр контрагентов (2026-07-12): GET открыт всем залогиненным,
+# POST/PUT/DELETE — только admin (см. routers/counterparties.py).
+app.include_router(counterparties_router.router, dependencies=protected)
 
 # Статические файлы фото приёмки: /photos/<filename>
 # PHOTOS_DIR задаётся env (docker-compose: /photos → ./data/photos на хосте).
