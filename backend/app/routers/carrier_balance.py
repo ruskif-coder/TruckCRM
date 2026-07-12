@@ -53,21 +53,23 @@ def carrier_balance_summary(session: Session = Depends(get_session)):
                 cp_name_to_carriers[cp_name].append((c.name or "").strip())
 
     # Рейсы: группируем по (carrier_name, ISO-неделя dep_at)
-    # gross = Σ trip.amount, fines = Σ trip.fines
+    # gross и trips  — только не отменённые (выручки нет)
+    # fines          — ВСЕ рейсы, включая отменённые: штраф за отмену
+    #                  реален и должен уменьшать то, что мы платим перевозчику
     week_buckets: dict = defaultdict(lambda: {"gross": 0.0, "fines": 0.0, "trips": 0})
     for t in trips:
         if not t.dep_at:
-            continue
-        if (t.status or "").lower().startswith("отмен"):
             continue
         name = (t.carrier_name or t.source or "").strip()
         if not name:
             continue
         wk = _iso_week_monday(t.dep_at.date())
         key = (name, wk)
-        week_buckets[key]["gross"] += t.amount or 0
-        week_buckets[key]["fines"] += t.fines or 0
-        week_buckets[key]["trips"] += 1
+        cancelled = (t.status or "").lower().startswith("отмен")
+        if not cancelled:
+            week_buckets[key]["gross"] += t.amount or 0
+            week_buckets[key]["trips"] += 1
+        week_buckets[key]["fines"] += t.fines or 0  # штрафы — всегда
 
     # Агрегируем по неделям
     carrier_net: dict[str, float] = defaultdict(float)
