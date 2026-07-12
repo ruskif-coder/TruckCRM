@@ -159,9 +159,15 @@ export default function Dashboard() {
   }));
   const allAlerts = [...expiryAlerts, ...alerts];
   const topTrucks = by_truck.slice(0, 3);
-  const donutSegments = cashflow.by_category
-    .slice(0, 6)
-    .map((c, i) => ({ name: c.category, count: c.value, color: DONUT_COLORS[i % DONUT_COLORS.length] }));
+  // Первый сегмент — поступления (зелёный), затем расходы по статьям (до 5)
+  const donutSegments = [
+    ...(cashflow.income > 0
+      ? [{ name: "Поступления", count: cashflow.income, color: "var(--good, #27ae60)" }]
+      : []),
+    ...cashflow.by_category
+      .slice(0, 5)
+      .map((c, i) => ({ name: c.category, count: c.value, color: DONUT_COLORS[i % DONUT_COLORS.length] })),
+  ];
 
   const lastWeekTrips = trend.trips[trend.trips.length - 1]?.v ?? 0;
   const prevWeekTrips = trend.trips[trend.trips.length - 2]?.v ?? 0;
@@ -417,7 +423,7 @@ export default function Dashboard() {
         {/* Cashflow structure donut */}
         <section className="fcard a-struct">
           <div className="card-head">
-            <div className="card-title">Структура расходов</div>
+            <div className="card-title">Денежный поток</div>
             <Link className="chip-ic" to="/expenses">
               <Icon name="expand" size={16} />
             </Link>
@@ -425,7 +431,7 @@ export default function Dashboard() {
           {donutSegments.length === 0 ? (
             <p style={{ color: "var(--ink-3)", fontSize: "0.85rem" }}>Нет операций по денежному потоку за период</p>
           ) : (
-            <Donut segments={donutSegments} centerLabel="расходы" centerValue={moneyWhole(cashflow.expense)} valueFontSize={13} />
+            <Donut segments={donutSegments} centerLabel="сальдо" centerValue={moneyWhole(cashflow.net)} valueFontSize={13} />
           )}
           {/* 2026-06-28: без копеек + чуть меньший шрифт - только в этом виджете
               (moneyWhole + инлайн fontSize переопределяет .foot3 .f .n из

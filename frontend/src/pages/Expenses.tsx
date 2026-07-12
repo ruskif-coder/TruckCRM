@@ -1109,7 +1109,11 @@ export default function Expenses() {
         </div>
       </div>
 
-      {selectedIds.size > 0 && (
+      {selectedIds.size > 0 && (() => {
+        const selEntries = entries.filter((e) => selectedIds.has(e.id));
+        const selIncome = selEntries.reduce((s, e) => s + (e.income || 0), 0);
+        const selExpense = selEntries.reduce((s, e) => s + (e.expense || 0), 0);
+        return (
         <div
           className="fcard"
           style={{
@@ -1118,9 +1122,23 @@ export default function Expenses() {
             flexDirection: "row",
             justifyContent: "space-between",
             alignItems: "center",
+            flexWrap: "wrap",
+            gap: 12,
           }}
         >
-          <span style={{ fontSize: 14 }}>Выбрано операций: {selectedIds.size}</span>
+          <div style={{ display: "flex", gap: 24, alignItems: "center", flexWrap: "wrap" }}>
+            <span style={{ fontSize: 14 }}>Выбрано операций: <strong>{selectedIds.size}</strong></span>
+            {selIncome > 0 && (
+              <span style={{ fontSize: 13, color: "var(--good-ink, #27ae60)" }}>
+                Поступления: <strong>{money(selIncome)}</strong>
+              </span>
+            )}
+            {selExpense > 0 && (
+              <span style={{ fontSize: 13, color: "var(--ember, #e04)" }}>
+                Списания: <strong>{money(selExpense)}</strong>
+              </span>
+            )}
+          </div>
           <div style={{ display: "flex", gap: 10 }}>
             <button className="pill-btn" onClick={() => setSelectedIds(new Set())}>
               Снять выбор
@@ -1130,7 +1148,8 @@ export default function Expenses() {
             </button>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       <div className="fcard">
         {loading ? (
