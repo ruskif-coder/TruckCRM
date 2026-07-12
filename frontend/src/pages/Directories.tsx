@@ -18,11 +18,12 @@ import Icon from "../components/Icon";
 import Vehicles from "./Vehicles";
 import Drivers from "./Drivers";
 
-type TabId = "vehicles" | "drivers" | "carriers";
+type TabId = "vehicles" | "drivers" | "carriers" | "counterparties";
 const TABS: { id: TabId; label: string }[] = [
   { id: "vehicles", label: "Автомобили" },
   { id: "drivers", label: "Водители" },
   { id: "carriers", label: "Перевозчики" },
+  { id: "counterparties", label: "Контрагенты" },
 ];
 
 export default function Directories() {
@@ -65,6 +66,7 @@ export default function Directories() {
       {tab === "vehicles" && <Vehicles tabsNav={tabsNav} />}
       {tab === "drivers" && <Drivers tabsNav={tabsNav} />}
       {tab === "carriers" && <CarriersTab tabsNav={tabsNav} />}
+      {tab === "counterparties" && <CounterpartiesTab tabsNav={tabsNav} />}
     </div>
   );
 }
@@ -94,6 +96,7 @@ type Counterparty = {
   id: number;
   name: string;
   inn: string;
+  vat_rate: number;
 };
 
 type CarrierFormState = {
@@ -452,6 +455,166 @@ function TextField({
     <div style={{ flex: 1, minWidth: 160 }}>
       <label className="label">{label}</label>
       <input type={type} className="input" value={value} onChange={(e) => onChange(e.target.value)} />
+    </div>
+  );
+}
+
+// ─── Контрагенты ─────────────────────────────────────────────────────────────
+// Добавлено 2026-07-12: справочник контрагентов с подсветкой незаполненных
+// (пустой ИНН → красная строка «Требует дозаполнения»). Контрагент может
+// быть создан «на лету» со страницы Расходов (только с названием); здесь
+// диспетчер дозаполняет ИНН и НДС.
+type CounterpartyFormState = { name: string; inn: string; vat_rate: string };
+const EMPTY_CP_FORM: CounterpartyFormState = { name: "", inn: "", vat_rate: "" };
+
+function CounterpartiesTab({ tabsNav }: { tabsNav?: ReactNode }) {
+  const [list, setList] = useState<Counterparty[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [form, setForm] = useState<CounterpartyFormState>(EMPTY_CP_FORM);
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  async function loadAll() {
+    setLoading(true); setError(null);
+    try { setList(await api.get<Counterparty[]>("/api/counterparties/")); }
+    catch (err) { setError(err instanceof ApiError ? err.message : "Ошибка загрузки"); }
+    finally { setLoading(false); }
+  }
+
+  useEffect(() => { loadAll(); }, []);
+
+  function openCreate() {
+    setEditingId(null); setForm(EMPTY_CP_FORM); setFormError(null); setModalOpen(true);
+  }
+  function openEdit(cp: Counterparty) {
+    setEditingId(cp.id);
+    setForm({ name: cp.name || "", inn: cp.inn || "", vat_rate: cp.vat_rate ? String(cp.vat_rate) : "" });
+    setFormError(null); setModalOpen(true);
+  }
+  function closeModal() { setModalOpen(false); }
+  function setF<K extends keyof CounterpartyFormState>(key: K, v: CounterpartyFormState[K]) {
+    setForm((f) => ({ ...f, [key]: v }));
+  }
+
+  async function handleSave() {
+    if (!form.name.trim()) { setFormError("Укажите название"); return; }
+    setSaving(true); setFormError(null);
+    try {
+      const payload = { name: form.name.trim(), inn: form.inn.trim(), vat_rate: form.vat_rate ? Number(form.vat_rate) : 0 };
+      if (editingId) await api.put(`/api/counterparties/${editingId}`, payload);
+      else await api.post("/api/counterparties/", payload);
+      setModalOpen(false); await loadAll();
+    } catch (err) { setFormError(err instanceof ApiError ? err.message : "Ошибка сохранения"); }
+    finally { setSaving(false); }
+  }
+
+  async function handleDelete() {
+    if (!editingId) return;
+    if (!window.confirm("Удалить контрагента?")) return;
+    setSaving(true); setFormError(null);
+    try { await api.delete(`/api/counterparties/${editingId}`); setModalOpen(false); await loadAll(); }
+    catch (err) { setFormError(err instanceof ApiError ? err.message : "Ошибка удаления"); }
+    finally { setSaving(false); }
+  }
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+        {tabsNav}
+        <button className="pill-btn solid" onClick={openCreate}>
+          <Icon name="plus" size={17} /> <span className="lbl-hide">Добавить контрагента</span>
+        </button>
+      </div>
+
+      {error && <p className="fcard" style={{ color: "var(--ember)", marginBottom: 24 }}>{error}</p>}
+
+      <div className="fcard" style={{ padding: 0 }}>
+        {loading ? (
+          <p style={{ color: "var(--ink-3)", padding: "20px 24px" }}>Загрузка...</p>
+        ) : list.length === 0 ? (
+          <p style={{ color: "var(--ink-3)", padding: "20px 24px" }}>Нет контрагентов. Добавьте первого.</p>
+        ) : (
+          <div style={{ overflowX: "auto", padding: "16px 20px" }}>
+            <table>
+              <thead>
+                <tr>
+                  <th>Название</th>
+                  <th>ИНН</th>
+                  <th>НДС %</th>
+                  <th>Статус</th>
+                </tr>
+              </thead>
+              <tbody>
+                {list.map((cp) => {
+                  const incomplete = !cp.inn;
+                  return (
+                    <tr
+                      key={cp.id}
+                      onClick={() => openEdit(cp)}
+                      style={{ cursor: "pointer", background: incomplete ? "rgba(224,4,4,.04)" : undefined }}
+                    >
+                      <td style={{ color: incomplete ? "var(--ember,#e04)" : undefined, fontWeight: incomplete ? 600 : undefined }}>
+                        {cp.name}
+                      </td>
+                      <td style={{ color: incomplete ? "var(--ember,#e04)" : undefined }}>
+                        {cp.inn || "—"}
+                      </td>
+                      <td>{cp.vat_rate ? `${cp.vat_rate}%` : "—"}</td>
+                      <td style={{ fontSize: 12, color: incomplete ? "var(--ember,#e04)" : "var(--ok,#27ae60)" }}>
+                        {incomplete ? "Требует дозаполнения" : "Заполнен"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {modalOpen && (
+        <div className="modal-overlay">
+          <div className="fcard" style={{ width: 480, maxWidth: "94vw", padding: 0 }}>
+            <div style={{ background: "var(--dark)", color: "#fff", padding: "16px 24px", borderRadius: "26px 26px 0 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <h2 style={{ fontSize: 18, margin: 0 }}>{editingId ? "Редактировать контрагента" : "Новый контрагент"}</h2>
+              <button type="button" onClick={closeModal} style={{ background: "none", border: "none", color: "#fff", fontSize: 22, cursor: "pointer", lineHeight: 1 }}>×</button>
+            </div>
+            <div style={{ padding: 24 }}>
+              <Row><TextField label="Название" value={form.name} onChange={(v) => setF("name", v)} /></Row>
+              <Row><TextField label="ИНН" value={form.inn} onChange={(v) => setF("inn", v)} /></Row>
+              <Row><TextField label="НДС %" type="number" value={form.vat_rate} onChange={(v) => setF("vat_rate", v)} /></Row>
+
+              {!form.inn.trim() && (
+                <p style={{ fontSize: 12, color: "var(--ember,#e04)", margin: "-8px 0 16px" }}>
+                  Контрагент без ИНН помечается как незаполненный
+                </p>
+              )}
+
+              {formError && <p style={{ color: "var(--ember)", fontSize: 13, margin: "0 0 12px" }}>{formError}</p>}
+
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  {editingId && (
+                    <button type="button" className="pill-btn" style={{ color: "var(--bad-ink)" }} disabled={saving} onClick={handleDelete}>
+                      Удалить
+                    </button>
+                  )}
+                </div>
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button type="button" className="pill-btn" onClick={closeModal}>Отмена</button>
+                  <button type="button" className="pill-btn solid" disabled={saving} onClick={handleSave}>
+                    {saving ? "Сохранение..." : "Сохранить"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { api, ApiError } from "../api";
 import FineModal from "../components/FineModal";
@@ -46,6 +46,7 @@ type CashFlowEntry = {
 
 type Truck = { id: number; label: string; plate?: string };
 type Driver = { id: number; name: string; last_name: string; first_name: string; middle_name: string };
+type Counterparty = { id: number; name: string; inn: string; vat_rate: number };
 
 // Mirrors models.CASHFLOW_STATUSES / CASHFLOW_BANKS / CASHFLOW_CATEGORIES
 // (backend/app/models.py) - duplicated here the same way TRIP_SOURCES is
@@ -197,6 +198,130 @@ const tdStyle: CSSProperties = {
   verticalAlign: "top",
 };
 
+// CounterpartyCombobox — autocomplete + inline create.
+// При выборе существующего контрагента вызывает onVatChange с его vat_rate,
+// чтобы автоматически проставить НДС в форме. При вводе нового названия —
+// создаёт контрагента (POST /api/counterparties/) с пустым ИНН (требует
+// дозаполнения в Справочниках), вызывает onCounterpartyCreated, чтобы
+// обновить список в памяти без перезагрузки страницы.
+function CounterpartyCombobox({
+  counterparties,
+  value,
+  onChange,
+  onVatChange,
+  onCounterpartyCreated,
+}: {
+  counterparties: Counterparty[];
+  value: string;
+  onChange: (name: string) => void;
+  onVatChange: (vatStr: string) => void;
+  onCounterpartyCreated: (cp: Counterparty) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [inputVal, setInputVal] = useState(value);
+  const [creating, setCreating] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Sync when parent resets the form
+  useEffect(() => { setInputVal(value); }, [value]);
+
+  const q = inputVal.trim().toLowerCase();
+  const filtered = q
+    ? counterparties.filter((cp) => cp.name.toLowerCase().includes(q))
+    : counterparties;
+  const exactMatch = counterparties.find((cp) => cp.name.toLowerCase() === q);
+  const showAdd = inputVal.trim() !== "" && !exactMatch;
+
+  useEffect(() => {
+    function onOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    if (open) document.addEventListener("mousedown", onOutside);
+    return () => document.removeEventListener("mousedown", onOutside);
+  }, [open]);
+
+  function selectExisting(cp: Counterparty) {
+    setInputVal(cp.name);
+    onChange(cp.name);
+    if (cp.vat_rate) onVatChange(String(cp.vat_rate));
+    setOpen(false);
+  }
+
+  async function createNew() {
+    const name = inputVal.trim();
+    if (!name || creating) return;
+    setCreating(true);
+    try {
+      const created = await api.post<Counterparty>("/api/counterparties/", { name, inn: "" });
+      setInputVal(created.name);
+      onChange(created.name);
+      onCounterpartyCreated(created);
+    } catch { /* пользователь сам увидит пустое поле */ }
+    finally {
+      setCreating(false);
+      setOpen(false);
+    }
+  }
+
+  const dropStyle: CSSProperties = {
+    position: "absolute", top: "100%", left: 0, right: 0, zIndex: 200,
+    background: "#fff", border: "1px solid var(--border, #ebebef)",
+    borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,.12)",
+    maxHeight: 220, overflowY: "auto", marginTop: 2,
+  };
+  const itemStyle: CSSProperties = {
+    padding: "8px 14px", fontSize: 13, cursor: "pointer",
+    borderBottom: "1px solid var(--border, #ebebef)",
+  };
+
+  return (
+    <div ref={ref} style={{ flex: 1, minWidth: 160, position: "relative" }}>
+      <label className="label">Контрагент</label>
+      <input
+        type="text"
+        className="input"
+        value={inputVal}
+        placeholder="Начните вводить..."
+        onChange={(e) => {
+          setInputVal(e.target.value);
+          onChange(e.target.value);
+          setOpen(true);
+        }}
+        onFocus={() => setOpen(true)}
+      />
+      {open && (filtered.length > 0 || showAdd) && (
+        <div style={dropStyle}>
+          {filtered.map((cp) => (
+            <div
+              key={cp.id}
+              style={itemStyle}
+              onMouseDown={() => selectExisting(cp)}
+              onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg,#f5f5f9)")}
+              onMouseLeave={(e) => (e.currentTarget.style.background = "")}
+            >
+              {cp.name}
+              {cp.inn ? <span style={{ color: "var(--smoke)", fontSize: 11, marginLeft: 6 }}>ИНН {cp.inn}</span> : (
+                <span style={{ color: "var(--ember,#e04)", fontSize: 11, marginLeft: 6 }}>Требует дозаполнения</span>
+              )}
+              {cp.vat_rate ? <span style={{ color: "var(--smoke)", fontSize: 11, marginLeft: 6 }}>НДС {cp.vat_rate}%</span> : null}
+            </div>
+          ))}
+          {showAdd && (
+            <div
+              style={{ ...itemStyle, color: "var(--primary,#4f6ef7)", fontWeight: 600, borderBottom: "none" }}
+              onMouseDown={createNew}
+              onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg,#f5f5f9)")}
+              onMouseLeave={(e) => (e.currentTarget.style.background = "")}
+            >
+              {creating ? "Добавление..." : `+ Добавить «${inputVal.trim()}»`}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Expenses() {
   const [tab, setTab] = useState<ExpensesTabId>("registry");
   const [entries, setEntries] = useState<CashFlowEntry[]>([]);
@@ -248,6 +373,7 @@ export default function Expenses() {
   const [fineOpen, setFineOpen] = useState(false); // «Выписать штраф» modal
   // Статьи расходов: загружаются из API /api/expense-categories/ (#145)
   const [categories, setCategories] = useState<string[]>(CATEGORIES);
+  const [counterparties, setCounterparties] = useState<Counterparty[]>([]);
 
   // Журнал заявок на компенсацию (вкладка «Заявки», 2026-07-04)
   type CompRow = {
@@ -302,17 +428,19 @@ export default function Expenses() {
     setError(null);
     try {
       type ExpCat = { id: number; name: string; active: boolean };
-      const [e, tr, dr, cats] = await Promise.all([
+      const [e, tr, dr, cats, cps] = await Promise.all([
         api.get<CashFlowEntry[]>("/api/expenses/"),
         api.get<Truck[]>("/api/trucks/"),
         api.get<Driver[]>("/api/drivers/"),
         api.get<ExpCat[]>("/api/expense-categories/").catch(() => [] as ExpCat[]),
+        api.get<Counterparty[]>("/api/counterparties/").catch(() => [] as Counterparty[]),
       ]);
       setEntries(e);
       setTrucks(tr);
       setDrivers(dr);
       const names = cats.filter(c => c.active).map(c => c.name);
       if (names.length > 0) setCategories(names);
+      setCounterparties(cps);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Ошибка загрузки");
     } finally {
@@ -807,7 +935,13 @@ export default function Expenses() {
               options={categories}
               placeholder="Статья"
             />
-            <TextField label="Контрагент" value={newForm.counterparty} onChange={(v) => setNewField("counterparty", v)} />
+            <CounterpartyCombobox
+              counterparties={counterparties}
+              value={newForm.counterparty}
+              onChange={(name) => setNewField("counterparty", name)}
+              onVatChange={(v) => setNewField("vat_pct", v)}
+              onCounterpartyCreated={(cp) => setCounterparties((prev) => [...prev, cp])}
+            />
             <TextField label="Назначение" value={newForm.purpose} onChange={(v) => setNewField("purpose", v)} />
           </Row>
 
@@ -1159,7 +1293,13 @@ export default function Expenses() {
             </Row>
 
             <Row>
-              <TextField label="Контрагент" value={form.counterparty} onChange={(v) => setField("counterparty", v)} />
+              <CounterpartyCombobox
+                counterparties={counterparties}
+                value={form.counterparty}
+                onChange={(name) => setField("counterparty", name)}
+                onVatChange={(v) => setField("vat_pct", v)}
+                onCounterpartyCreated={(cp) => setCounterparties((prev) => [...prev, cp])}
+              />
             </Row>
 
             <Row>
