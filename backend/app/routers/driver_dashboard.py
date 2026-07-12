@@ -61,7 +61,7 @@ def driver_summary(
     if not user.driver_id:
         # Не водитель (нет linked Driver record) - пустой ответ, не ошибка:
         # функция может быть вызвана любым залогиненным пользователем, но
-        # полезна только водителями. Фронтенд (DriverDashboard.tsx) это знает.
+        # полезна только водителям. Фронтенд (DriverDashboard.tsx) это знает.
         return {
             "driver_id": None,
             "driver_name": user.full_name or user.username,
