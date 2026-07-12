@@ -570,6 +570,10 @@ class CashFlowEntryBase(SQLModel):
     # дубли, и не трогает status/vat_pct/counterparty/purpose, если бухгалтер
     # их уже отредактировал вручную.
     fuel_source_key: str = ""
+    # Кто внёс запись вручную (2026-07-12, v1.1.2).
+    # Для строк, созданных кнопкой «Принять» на заявке на компенсацию,
+    # это — пользователь, нажавший кнопку (он же approved_by_user_id).
+    created_by_user_id: Optional[int] = Field(default=None, foreign_key="user.id")
 
 
 class CashFlowEntry(CashFlowEntryBase, table=True):
@@ -878,6 +882,8 @@ class CompensationRequest(SQLModel, table=True):
     status: str = "на рассмотрении"        # на рассмотрении / принято / отказано
     reject_reason: str = Field(default="")
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    # Кто принял заявку (2026-07-12, v1.1.2).
+    approved_by_user_id: Optional[int] = Field(default=None, foreign_key="user.id")
 
 
 class CompensationRequestCreate(SQLModel):
@@ -1074,3 +1080,28 @@ class DriverTransactionCreate(SQLModel):
     tx_type: str
     amount: float  # всегда > 0; сервер негатирует для debit-типов
     description: str = ""
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Counterparty ("Контрагенты") — справочник контрагентов (2026-07-12, v1.1.2).
+# Используется для привязки перевозчиков (Carrier.counterparty_id) и
+# зачёта поступлений при расчёте баланса перевозчика.
+# ══════════════════════════════════════════════════════════════════════════════
+class CounterpartyBase(SQLModel):
+    name: str
+    inn: str = ""
+    vat_rate: float = 0
+
+
+class Counterparty(CounterpartyBase, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+
+class CounterpartyCreate(CounterpartyBase):
+    pass
+
+
+class CounterpartyUpdate(SQLModel):
+    name: Optional[str] = None
+    inn: Optional[str] = None
+    vat_rate: Optional[float] = None
