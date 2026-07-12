@@ -1090,7 +1090,7 @@ export default function Expenses() {
 
       <div style={{ display: "flex", gap: 16, marginBottom: 16 }}>
         <div className="fcard" style={{ flex: 1 }}>
-          <p style={{ fontSize: 12, color: "var(--smoke)", margin: "0 0 4px" }}>Долг перевозчикам</p>
+          <p style={{ fontSize: 12, color: "var(--smoke)", margin: "0 0 4px" }}>Долг перевозчиков</p>
           <p style={{ fontSize: 22, fontWeight: 600, margin: 0, color: carrierDebt > 0 ? "var(--ember,#e04)" : undefined }}>
             {money(carrierDebt)}
           </p>
@@ -1105,7 +1105,7 @@ export default function Expenses() {
         </div>
         <div className="fcard" style={{ flex: 1 }}>
           <p style={{ fontSize: 12, color: "var(--smoke)", margin: "0 0 4px" }}>Сальдо</p>
-          <p style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{money(totalIncome - totalExpense - carrierDebt)}</p>
+          <p style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{money(carrierDebt + totalIncome - totalExpense)}</p>
         </div>
       </div>
 
