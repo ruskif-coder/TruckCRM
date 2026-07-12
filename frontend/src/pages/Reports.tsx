@@ -303,7 +303,7 @@ function CarriersTab() {
                                 <th style={{ textAlign: "right", fontSize: 12 }}>Рейсов</th>
                                 <th style={{ textAlign: "right", fontSize: 12 }}>Брутто</th>
                                 <th style={{ textAlign: "right", fontSize: 12 }}>Штрафы</th>
-                                <th style={{ textAlign: "right", fontSize: 12 }}>Netto</th>
+                                <th style={{ textAlign: "right", fontSize: 12 }}>Netto (после СК)</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -315,7 +315,7 @@ function CarriersTab() {
                                   <td style={{ textAlign: "right" }}>{w.trips}</td>
                                   <td style={{ textAlign: "right" }}>{money(w.gross)}</td>
                                   <td style={{ textAlign: "right", color: w.fines ? "var(--bad-ink)" : undefined }}>
-                                    {money(w.fines)}
+                                    {w.fines ? money(w.fines) : "—"}
                                   </td>
                                   <td style={{ textAlign: "right" }}>{money(w.net)}</td>
                                 </tr>
