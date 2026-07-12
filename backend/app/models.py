@@ -265,6 +265,9 @@ class CarrierBase(SQLModel):
     settlement_account: str = ""
     correspondent_account: str = ""
     insurance_pct: float = 0  # "% СК"
+    # Связь с контрагентом (2026-07-12): для зачёта поступлений при расчёте
+    # баланса перевозчика. Устанавливается вручную в карточке перевозчика.
+    counterparty_id: Optional[int] = Field(default=None, foreign_key="counterparty.id")
 
 
 class Carrier(CarrierBase, table=True):
@@ -289,6 +292,7 @@ class CarrierUpdate(SQLModel):
     settlement_account: Optional[str] = None
     correspondent_account: Optional[str] = None
     insurance_pct: Optional[float] = None
+    counterparty_id: Optional[int] = None
 
 
 # ---------------- DriverRate ("Условия оплаты водителя") ----------------
@@ -566,9 +570,6 @@ class CashFlowEntryBase(SQLModel):
     # дубли, и не трогает status/vat_pct/counterparty/purpose, если бухгалтер
     # их уже отредактировал вручную.
     fuel_source_key: str = ""
-    # Added 2026-07-12: кто внёс запись в реестр расходов (user.id).
-    # Для записей, созданных при согласовании компенсации — id согласовавшего.
-    created_by_user_id: Optional[int] = Field(default=None, foreign_key="user.id")
 
 
 class CashFlowEntry(CashFlowEntryBase, table=True):
@@ -877,8 +878,6 @@ class CompensationRequest(SQLModel, table=True):
     status: str = "на рассмотрении"        # на рассмотрении / принято / отказано
     reject_reason: str = Field(default="")
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    # Added 2026-07-12: кто согласовал заявку (user.id admin/foreman/accountant)
-    approved_by_user_id: Optional[int] = Field(default=None, foreign_key="user.id")
 
 
 class CompensationRequestCreate(SQLModel):
@@ -1075,29 +1074,3 @@ class DriverTransactionCreate(SQLModel):
     tx_type: str
     amount: float  # всегда > 0; сервер негатирует для debit-типов
     description: str = ""
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# Контрагенты (2026-07-12)
-# Справочник контрагентов — доступен в Настройках → «Контрагенты» (admin).
-# Используется в реестре расходов как выпадающий список вместо свободного
-# текстового поля «Контрагент».
-# ══════════════════════════════════════════════════════════════════════════════
-class CounterpartyBase(SQLModel):
-    name: str
-    inn: str = ""        # ИНН — plain text, без валидации
-    vat_rate: float = 0  # НДС, %
-
-
-class Counterparty(CounterpartyBase, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-
-
-class CounterpartyCreate(CounterpartyBase):
-    pass
-
-
-class CounterpartyUpdate(SQLModel):
-    name: Optional[str] = None
-    inn: Optional[str] = None
-    vat_rate: Optional[float] = None

@@ -1,3 +1,3 @@
 // Версия приложения — обновлять при каждом деплое вместе с package.json.
 // Импортируется в pages/Settings.tsx (вкладка Профиль → раздел «О системе»).
-export const APP_VERSION = "1.1.2";
+export const APP_VERSION = "1.1.3";

@@ -87,6 +87,13 @@ type Carrier = {
   settlement_account: string;
   correspondent_account: string;
   insurance_pct: number;
+  counterparty_id: number | null;
+};
+
+type Counterparty = {
+  id: number;
+  name: string;
+  inn: string;
 };
 
 type CarrierFormState = {
@@ -103,6 +110,7 @@ type CarrierFormState = {
   settlement_account: string;
   correspondent_account: string;
   insurance_pct: string;
+  counterparty_id: number | null;
 };
 
 const EMPTY_CARRIER_FORM: CarrierFormState = {
@@ -119,6 +127,7 @@ const EMPTY_CARRIER_FORM: CarrierFormState = {
   settlement_account: "",
   correspondent_account: "",
   insurance_pct: "",
+  counterparty_id: null,
 };
 
 function carrierToForm(c: Carrier): CarrierFormState {
@@ -136,15 +145,21 @@ function carrierToForm(c: Carrier): CarrierFormState {
     settlement_account: c.settlement_account || "",
     correspondent_account: c.correspondent_account || "",
     insurance_pct: c.insurance_pct ? String(c.insurance_pct) : "",
+    counterparty_id: c.counterparty_id ?? null,
   };
 }
 
 function carrierToPayload(f: CarrierFormState) {
-  return { ...f, insurance_pct: f.insurance_pct ? Number(f.insurance_pct) : 0 };
+  return {
+    ...f,
+    insurance_pct: f.insurance_pct ? Number(f.insurance_pct) : 0,
+    counterparty_id: f.counterparty_id ?? null,
+  };
 }
 
 function CarriersTab({ tabsNav }: { tabsNav?: ReactNode }) {
   const [carriers, setCarriers] = useState<Carrier[]>([]);
+  const [counterparties, setCounterparties] = useState<Counterparty[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -158,8 +173,12 @@ function CarriersTab({ tabsNav }: { tabsNav?: ReactNode }) {
     setLoading(true);
     setError(null);
     try {
-      const c = await api.get<Carrier[]>("/api/carriers/");
+      const [c, cp] = await Promise.all([
+        api.get<Carrier[]>("/api/carriers/"),
+        api.get<Counterparty[]>("/api/counterparties/"),
+      ]);
       setCarriers(c);
+      setCounterparties(cp);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Ошибка загрузки");
     } finally {
@@ -266,19 +285,24 @@ function CarriersTab({ tabsNav }: { tabsNav?: ReactNode }) {
                   <th>Телефон</th>
                   <th>Контактное лицо</th>
                   <th>% СК</th>
+                  <th>Контрагент</th>
                 </tr>
               </thead>
               <tbody>
-                {carriers.map((c) => (
-                  <tr key={c.id} onClick={() => openEdit(c)} style={{ cursor: "pointer" }}>
-                    <td>{c.name}</td>
-                    <td>{c.full_name || "—"}</td>
-                    <td>{c.inn || "—"}</td>
-                    <td>{c.phone || "—"}</td>
-                    <td>{c.contact_person || "—"}</td>
-                    <td>{c.insurance_pct ? `${c.insurance_pct}%` : "—"}</td>
-                  </tr>
-                ))}
+                {carriers.map((c) => {
+                  const cp = counterparties.find((x) => x.id === c.counterparty_id);
+                  return (
+                    <tr key={c.id} onClick={() => openEdit(c)} style={{ cursor: "pointer" }}>
+                      <td>{c.name}</td>
+                      <td>{c.full_name || "—"}</td>
+                      <td>{c.inn || "—"}</td>
+                      <td>{c.phone || "—"}</td>
+                      <td>{c.contact_person || "—"}</td>
+                      <td>{c.insurance_pct ? `${c.insurance_pct}%` : "—"}</td>
+                      <td style={{ color: cp ? undefined : "var(--ink-3)" }}>{cp ? cp.name : "—"}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -346,6 +370,26 @@ function CarriersTab({ tabsNav }: { tabsNav?: ReactNode }) {
 
               <Row>
                 <TextField label="% СК" type="number" value={form.insurance_pct} onChange={(v) => setFieldValue("insurance_pct", v)} />
+              </Row>
+
+              <Row>
+                <div style={{ flex: 1, minWidth: 160 }}>
+                  <label className="label">Контрагент (для баланса)</label>
+                  <select
+                    className="input"
+                    value={form.counterparty_id ?? ""}
+                    onChange={(e) =>
+                      setFieldValue("counterparty_id", e.target.value ? Number(e.target.value) : null)
+                    }
+                  >
+                    <option value="">— не выбран —</option>
+                    {counterparties.map((cp) => (
+                      <option key={cp.id} value={cp.id}>
+                        {cp.name}{cp.inn ? ` (ИНН ${cp.inn})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </Row>
 
               {formError && <p style={{ color: "var(--ember)", fontSize: 13, margin: "0 0 12px" }}>{formError}</p>}

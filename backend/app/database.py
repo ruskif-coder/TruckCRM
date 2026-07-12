@@ -105,14 +105,10 @@ _PENDING_COLUMNS: dict[str, list[tuple[str, str, str]]] = {
     # is the lowercased class name with no underscores - "cashflowentry" -
     # and the table already has manually-entered rows, so it needs the same
     # ALTER TABLE treatment as the others above.
+    # 2026-07-12: added created_by_user_id (кто внёс запись вручную).
     "cashflowentry": [
         ("fuel_source_key", "VARCHAR", "''"),
-        # Added 2026-07-12 — кто внёс запись в реестр расходов.
         ("created_by_user_id", "INTEGER", "NULL"),
-    ],
-    # Added 2026-07-12 — кто согласовал заявку на компенсацию.
-    "compensationrequest": [
-        ("approved_by_user_id", "INTEGER", "NULL"),
     ],
     # Added 2026-06-29 for the "Пробеги" tab (см. models.MileageLogBase.driver_id,
     # own_filter_field в main.py) - таблица mileagelog уже существовала
@@ -127,6 +123,14 @@ _PENDING_COLUMNS: dict[str, list[tuple[str, str, str]]] = {
         ("photo_paths", "VARCHAR", "''"),
         ("priority", "VARCHAR", "'обычная'"),
         ("close_comment", "VARCHAR", "''"),
+    ],
+    # Added 2026-07-12: approved_by_user_id на заявки на компенсацию.
+    "compensationrequest": [
+        ("approved_by_user_id", "INTEGER", "NULL"),
+    ],
+    # Added 2026-07-12: связь перевозчика с контрагентом для баланса.
+    "carrier": [
+        ("counterparty_id", "INTEGER", "NULL"),
     ],
 }
 

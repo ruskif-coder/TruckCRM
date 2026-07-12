@@ -35,6 +35,7 @@ from .routers import trip_batches, trips as trips_router, trucks as trucks_route
 from .routers import maintenance as maintenance_router
 from .routers import driver_transactions as driver_transactions_router
 from .routers import counterparties as counterparties_router
+from .routers import carrier_balance as carrier_balance_router
 
 protected = [Depends(get_current_user)]
 
@@ -190,6 +191,9 @@ app.include_router(driver_transactions_router.router, dependencies=protected)
 # Реестр контрагентов (2026-07-12): GET открыт всем залогиненным,
 # POST/PUT/DELETE — только admin (см. routers/counterparties.py).
 app.include_router(counterparties_router.router, dependencies=protected)
+# Баланс перевозчиков (2026-07-12): сводка и детализация по неделям.
+# Auth-only — доступен всем залогиненным пользователям.
+app.include_router(carrier_balance_router.router, dependencies=protected)
 
 # Статические файлы фото приёмки: /photos/<filename>
 # PHOTOS_DIR задаётся env (docker-compose: /photos → ./data/photos на хосте).
