@@ -14,15 +14,25 @@
 from collections import defaultdict
 from datetime import date as date_type, timedelta
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 
+from .. import models
 from ..auth import get_current_user
 from ..database import get_session
 from ..models import Carrier, CashFlowEntry, Counterparty, Trip
 
 router = APIRouter(prefix="/api/carriers/balance", tags=["carrier-balance"])
 _auth = [Depends(get_current_user)]
+
+_STAFF_ROLES = {"admin", "foreman", "accountant"}
+
+
+def _require_staff(user: models.User = Depends(get_current_user)) -> models.User:
+    """Финансовые данные перевозчиков — только для staff (аудит-2026-07-13)."""
+    if user.role not in _STAFF_ROLES:
+        raise HTTPException(status_code=403, detail="Доступ только для admin/foreman/accountant")
+    return user
 
 
 def _iso_week_monday(d: date_type) -> date_type:
@@ -33,8 +43,11 @@ def _round2(v: float) -> float:
     return round(v, 2)
 
 
-@router.get("/", dependencies=_auth)
-def carrier_balance_summary(session: Session = Depends(get_session)):
+@router.get("/")
+def carrier_balance_summary(
+    session: Session = Depends(get_session),
+    _user: models.User = Depends(_require_staff),
+):
     """Сводка баланса по всем перевозчикам (за всё время, накопительно)."""
     carriers = session.exec(select(Carrier)).all()
     counterparties = {c.id: c for c in session.exec(select(Counterparty)).all()}

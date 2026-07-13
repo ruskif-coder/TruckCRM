@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from sqlmodel import Session
@@ -33,9 +34,6 @@ from .routers import vehicle_inspections as vehicle_inspections_router
 from .routers import trip_batches, trips as trips_router, trucks as trucks_router, users as users_router
 from .routers import maintenance as maintenance_router
 from .routers import driver_transactions as driver_transactions_router
-from .routers import counterparties as counterparties_router
-from .routers import carrier_balance as carrier_balance_router
-from .routers import files as files_router
 
 protected = [Depends(get_current_user)]
 
@@ -59,7 +57,15 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Транспорт CRM API", lifespan=lifespan)
+app = FastAPI(
+    title="Транспорт CRM API",
+    lifespan=lifespan,
+    # SECURITY (аудит-2026-07-13): Swagger/ReDoc отключены в production —
+    # раскрывали структуру API без авторизации. Для временного включения
+    # в dev замени на docs_url="/docs", redoc_url="/redoc".
+    docs_url=None,
+    redoc_url=None,
+)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
@@ -188,31 +194,38 @@ app.include_router(maintenance_router.router, dependencies=protected)
 # Журнал транзакций водителя (2026-07-05): корректировки баланса (компенсации,
 # штрафы, авансы). Auth-only — водитель видит только свои, staff — по driver_id.
 app.include_router(driver_transactions_router.router, dependencies=protected)
-# Реестр контрагентов (2026-07-12): GET открыт всем залогиненным,
-# POST/PUT/DELETE — только admin (см. routers/counterparties.py).
-app.include_router(counterparties_router.router, dependencies=protected)
-# Баланс перевозчиков (2026-07-12): сводка и детализация по неделям.
-# Auth-only — доступен всем залогиненным пользователям.
-app.include_router(carrier_balance_router.router, dependencies=protected)
 
-# Защищённая раздача файлов (2026-07-13, аудит безопасности 152-ФЗ).
-# Ранее StaticFiles раздавали /photos/ и /truck-scans/ публично — теперь
-# заменены на /api/files/photos/<name>?token= и /api/files/truck-scans/<name>?token=
-# с проверкой JWT в query-параметре (браузерные <img>/<a> не шлют Bearer).
-app.include_router(files_router.router)
-
-# Создаём папки при старте, если не существуют (поведение сохранено).
+# Статические файлы фото приёмки: /photos/<filename>
+# PHOTOS_DIR задаётся env (docker-compose: /photos → ./data/photos на хосте).
 _photos_dir = os.environ.get("PHOTOS_DIR", "./photos")
-_truck_scans_dir = os.environ.get("TRUCK_SCANS_DIR", "./truck_scans")
 os.makedirs(_photos_dir, exist_ok=True)
+app.mount("/photos", StaticFiles(directory=_photos_dir), name="photos")
+
+# Статические файлы скан-документов машин: /truck-scans/<filename>
+# TRUCK_SCANS_DIR задаётся env (docker-compose: /truck-scans → ./data/truck_scans).
+_truck_scans_dir = os.environ.get("TRUCK_SCANS_DIR", "./truck_scans")
 os.makedirs(_truck_scans_dir, exist_ok=True)
+app.mount("/truck-scans", StaticFiles(directory=_truck_scans_dir), name="truck-scans")
 
 
 @app.get("/api/health")
 def health():
-    """Расширенный healthcheck: состояние диска, БД и папки фото.
-    Не требует авторизации — используется для мониторинга извне (uptime-боты,
-    docker healthcheck и т.п.)."""
+    """Публичный healthcheck для uptime-ботов и docker healthcheck.
+    SECURITY (аудит-2026-07-13): возвращает только {"status": "ok"} — без
+    размеров БД, диска, фото. Детальная диагностика — только через авторизованный
+    эндпойнт /api/maintenance/... (admin-only, см. maintenance router)."""
+    return {"status": "ok"}
+
+
+@app.get("/api/health/details", dependencies=protected)
+def health_details(user: models.User = Depends(get_current_user)):
+    """Расширенный healthcheck: диск, БД, фото. Только для admin.
+    SECURITY (аудит-2026-07-13): инфраструктурная информация доступна
+    только авторизованным пользователям."""
+    if user.role != "admin":
+        from fastapi import HTTPException
+        raise HTTPException(403, "Только для admin")
+
     info: dict = {"status": "ok"}
 
     # Путь к файлу БД из env

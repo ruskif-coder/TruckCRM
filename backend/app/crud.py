@@ -103,7 +103,14 @@ def make_router(
         session: Session = Depends(get_session),
         user: models.User = Depends(get_current_user),
     ):
-        item = table_model(**payload.model_dump())
+        data = payload.model_dump()
+        # SECURITY (IDOR): если роутер использует own_filter_field (например
+        # "driver_id"), принудительно проставляем поле из токена — тело запроса
+        # не доверяем. Водитель не может создать запись от имени другого водителя,
+        # подставив чужой driver_id в теле запроса.
+        if own_filter_field and user.role == "driver" and user.driver_id is not None:
+            data[own_filter_field] = user.driver_id
+        item = table_model(**data)
         session.add(item)
         session.commit()
         session.refresh(item)
@@ -124,6 +131,9 @@ def make_router(
         item = session.get(table_model, item_id)
         if not item:
             raise HTTPException(404, f"{tag} not found")
+        # SECURITY (IDOR): водитель не может изменять чужие записи
+        if _belongs_to_other_driver(item, user):
+            raise HTTPException(403, "Доступ запрещён")
         before = item.model_dump()
         data = payload.model_dump(exclude_unset=True)
         for k, v in data.items():
@@ -148,6 +158,9 @@ def make_router(
         item = session.get(table_model, item_id)
         if not item:
             raise HTTPException(404, f"{tag} not found")
+        # SECURITY (IDOR): водитель не может удалять чужие записи
+        if _belongs_to_other_driver(item, user):
+            raise HTTPException(403, "Доступ запрещён")
         before = item.model_dump()
         session.delete(item)
         session.commit()
