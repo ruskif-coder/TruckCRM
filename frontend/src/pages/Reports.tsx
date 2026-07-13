@@ -43,6 +43,7 @@ type SortKey =
   | "fuel"
   | "driver_pct"
   | "driver_payout"
+  | "driver_balance"
   | "profit"
   | "profitability"
   | "price_per_trip"
@@ -81,6 +82,7 @@ const COLUMNS: { key: SortKey; label: string }[] = [
   { key: "fuel", label: "Топливо" },
   { key: "driver_pct", label: "% водит." },
   { key: "driver_payout", label: "Выплата водителю" },
+  { key: "driver_balance", label: "Баланс" },
   { key: "profit", label: "Прибыль" },
   { key: "profitability", label: "Рентаб." },
   { key: "price_per_trip", label: "Цена рейса" },
@@ -117,6 +119,8 @@ function sortValue(r: FlatRow, key: SortKey): string | number {
       return r.driver_pct;
     case "driver_payout":
       return r.driver_payout;
+    case "driver_balance":
+      return 0; // будет заменено при сортировке через driverBalances map
     case "profit":
       return r.profit;
     case "profitability":
@@ -126,31 +130,6 @@ function sortValue(r: FlatRow, key: SortKey): string | number {
     case "price_per_day":
       return r.price_per_day;
   }
-}
-
-// Допуск в полкопейки (2026-06-28, фикс): driver_payout приходит с backend
-// "грязным" float (net*pct/100, например 41743.245000000003), а сравнение
-// paid>=payout было строгим - при разнице меньше копейки плашка уходила в
-// жёлтую, хотя округлённый до копеек "Остаток" показывал "0 ₽" (виден баг -
-// плашка жёлтая, в подсказке остаток 0). Сравниваем округлённо.
-const KOPECK = 0.005;
-
-// Бейдж оплаты в колонке "Выплата водителю" (2026-06-28, план "кабинет
-// водителя", п.1 доработка): прозрачный - проводок ещё не было, жёлтая
-// (.st-warn) - сумма проводок меньше расчётной выплаты, зелёная (.st-route) -
-// проведено столько же или больше.
-function settleBadgeClass(paid: number, payout: number): string {
-  if (!paid || paid <= 0) return "";
-  return paid >= payout - KOPECK ? "st-route" : "st-warn";
-}
-
-// Подсказка при наведении на жёлтую плашку (2026-06-28, доработка) - разница
-// между расчётной выплатой (план) и суммой уже проведённых проводок (факт).
-// Для зелёной/прозрачной плашки подсказка не нужна - там либо всё ясно по
-// самой сумме, либо проводок ещё не было.
-function settleBadgeTitle(paid: number, payout: number): string | undefined {
-  if (!paid || paid <= 0 || paid >= payout - KOPECK) return undefined;
-  return `План: ${money(payout)} · Проведено: ${money(paid)} · Остаток: ${money(payout - paid)}`;
 }
 
 function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
@@ -379,11 +358,9 @@ export default function Reports() {
   // «Вид» (2026-06-29) — по умолчанию «Полный», как и раньше.
   const [view, setView] = useState<ReportView>("full");
 
-  // «Провести расчёт» (2026-06-28, план "кабинет водителя", п.3)
-  const [settleRow, setSettleRow] = useState<FlatRow | null>(null);
-  const [settleAmount, setSettleAmount] = useState("");
-  const [settleSaving, setSettleSaving] = useState(false);
-  const [settleError, setSettleError] = useState<string | null>(null);
+  // Текущий баланс по каждому водителю (2026-07-13): загружается один раз,
+  // не зависит от выбранного периода — это накопительный итог на сегодня.
+  const [driverBalances, setDriverBalances] = useState<Record<number, number>>({});
 
   // По умолчанию — последние 5 недель (задача #137, 2026-06-28)
   const [{ dateFrom: initFrom, dateTo: initTo }] = useState(() => lastNWeeksRange(5));
@@ -411,14 +388,17 @@ export default function Reports() {
     };
   }, [dateFrom, dateTo, tab]);
 
-  async function reloadWeekly() {
-    try {
-      const result = await api.get<WeeklyData>(`/api/dashboard/weekly?date_from=${dateFrom}&date_to=${dateTo}`);
-      setData(result);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Ошибка загрузки");
-    }
-  }
+  // Загружаем балансы водителей один раз при монтировании (не зависят от периода)
+  useEffect(() => {
+    api
+      .get<{ driver_id: number; balance: number }[]>("/api/driver-transactions/balances")
+      .then((data) => {
+        const map: Record<number, number> = {};
+        data.forEach((r) => { map[r.driver_id] = r.balance; });
+        setDriverBalances(map);
+      })
+      .catch(() => { /* показываем "—" если не удалось загрузить */ });
+  }, []);
 
   const flatRows: FlatRow[] = useMemo(
     () =>
@@ -452,14 +432,21 @@ export default function Reports() {
   const sortedRows = useMemo(() => {
     const rows = [...filteredRows];
     rows.sort((a, b) => {
-      const va = sortValue(a, sortKey);
-      const vb = sortValue(b, sortKey);
+      let va: string | number;
+      let vb: string | number;
+      if (sortKey === "driver_balance") {
+        va = a.driver_id ? (driverBalances[a.driver_id] ?? 0) : 0;
+        vb = b.driver_id ? (driverBalances[b.driver_id] ?? 0) : 0;
+      } else {
+        va = sortValue(a, sortKey);
+        vb = sortValue(b, sortKey);
+      }
       let cmp = typeof va === "string" && typeof vb === "string" ? va.localeCompare(vb, "ru") : (va as number) - (vb as number);
       if (cmp === 0) cmp = a.week_start.localeCompare(b.week_start);
       return sortDir === "asc" ? cmp : -cmp;
     });
     return rows;
-  }, [filteredRows, sortKey, sortDir]);
+  }, [filteredRows, sortKey, sortDir, driverBalances]);
 
   const totals = useMemo(
     () =>
@@ -488,41 +475,6 @@ export default function Reports() {
     else {
       setSortKey(key);
       setSortDir("asc");
-    }
-  }
-
-  function openSettle(r: FlatRow) {
-    setSettleRow(r);
-    setSettleAmount(r.driver_payout.toFixed(2));
-    setSettleError(null);
-  }
-
-  async function handleSettleSave() {
-    if (!settleRow) return;
-    const amount = Number(settleAmount);
-    if (!settleAmount.trim() || Number.isNaN(amount) || amount <= 0) {
-      setSettleError("Укажите сумму (число больше 0)");
-      return;
-    }
-    setSettleSaving(true);
-    setSettleError(null);
-    try {
-      await api.post("/api/expenses/", {
-        date: settleRow.week_start,
-        status: "ОПЛАЧЕНО",
-        expense: amount,
-        category: "Расчёт с водителем",
-        truck_id: settleRow.truck_id,
-        driver_id: settleRow.driver_id,
-        counterparty: settleRow.driver_label,
-        purpose: `Расчёт по отчёту за неделю ${fmtDate(settleRow.week_start)} – ${fmtDate(settleRow.week_end)}`,
-      });
-      await reloadWeekly();
-      setSettleRow(null);
-    } catch (err) {
-      setSettleError(err instanceof ApiError ? err.message : "Ошибка сохранения");
-    } finally {
-      setSettleSaving(false);
     }
   }
 
@@ -682,23 +634,22 @@ export default function Reports() {
                             <td>{money(r.toll)}</td>
                             <td>{money(r.fuel)}</td>
                             <td>{r.driver_pct.toFixed(0)}%</td>
-                            <td>
-                              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, width: "100%" }}>
-                                <span
-                                  className={`status ${settleBadgeClass(r.driver_paid, r.driver_payout)}`}
-                                  title={settleBadgeTitle(r.driver_paid, r.driver_payout)}
-                                >
-                                  {money(r.driver_payout)}
-                                </span>
-                                <button
-                                  type="button"
-                                  className="chip-ic"
-                                  title="Зафиксировать выплату водителю"
-                                  onClick={() => openSettle(r)}
-                                >
-                                  <Icon name="ruble" />
-                                </button>
-                              </div>
+                            <td>{money(r.driver_payout)}</td>
+                            <td style={(() => {
+                              const b = r.driver_id ? (driverBalances[r.driver_id] ?? null) : null;
+                              return {
+                                textAlign: "right" as const,
+                                fontWeight: 600,
+                                color: b === null ? undefined : b < 0 ? "var(--ember)" : b === 0 ? "var(--ink-3)" : undefined,
+                              };
+                            })()}
+                              title={r.driver_id && driverBalances[r.driver_id] !== undefined
+                                ? `Баланс водителя на сегодня: ${money(driverBalances[r.driver_id])}`
+                                : undefined}
+                            >
+                              {r.driver_id && driverBalances[r.driver_id] !== undefined
+                                ? money(driverBalances[r.driver_id])
+                                : "—"}
                             </td>
                             {view === "full" && (
                               <td style={{ color: r.profit >= 0 ? "var(--good-ink)" : "var(--bad-ink)", fontWeight: 700 }}>
@@ -725,6 +676,7 @@ export default function Reports() {
                           <td>{money(totals.fuel)}</td>
                           <td>—</td>
                           <td>{money(totals.driver_payout)}</td>
+                          <td style={{ textAlign: "right", color: "var(--ink-3)" }}>—</td>
                           {view === "full" && (
                             <td style={{ color: totals.profit >= 0 ? "var(--good-ink)" : "var(--bad-ink)" }}>
                               {money(totals.profit)}
@@ -753,49 +705,6 @@ export default function Reports() {
         </>
       )}
 
-      {settleRow && (
-        <div className="modal-overlay" onClick={() => !settleSaving && setSettleRow(null)}>
-          <div className="fcard" style={{ width: 420, maxWidth: "94vw", padding: 0 }} onClick={(e) => e.stopPropagation()}>
-            <div
-              style={{
-                background: "var(--dark)",
-                color: "#fff",
-                padding: "16px 24px",
-                borderRadius: "26px 26px 0 0",
-              }}
-            >
-              <h2 style={{ fontSize: 18, margin: 0 }}>Провести расчёт</h2>
-            </div>
-            <div style={{ padding: 24 }}>
-              <p style={{ color: "var(--ink-3)", fontSize: 13, marginBottom: 16 }}>
-                {settleRow.driver_label} · {settleRow.truck_label} · {fmtDate(settleRow.week_start)} – {fmtDate(settleRow.week_end)}
-                <br />
-                Сумма попадёт в реестр расходов (категория «Расчёт с водителем») с привязкой водитель+машина и датой
-                начала этой недели отчёта.
-              </p>
-              <div style={{ marginBottom: 16 }}>
-                <label className="label">Сумма, ₽</label>
-                <input
-                  type="number"
-                  className="input"
-                  autoFocus
-                  value={settleAmount}
-                  onChange={(e) => setSettleAmount(e.target.value)}
-                />
-              </div>
-              {settleError && <p style={{ color: "var(--ember)", fontSize: 13, margin: "0 0 12px" }}>{settleError}</p>}
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
-                <button type="button" className="pill-btn" disabled={settleSaving} onClick={() => setSettleRow(null)}>
-                  Отмена
-                </button>
-                <button type="button" className="pill-btn solid" disabled={settleSaving} onClick={handleSettleSave}>
-                  {settleSaving ? "Сохранение..." : "Сохранить"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
