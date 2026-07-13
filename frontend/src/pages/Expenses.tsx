@@ -1088,22 +1088,22 @@ export default function Expenses() {
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 16, marginBottom: 16 }}>
-        <div className="fcard" style={{ flex: 1 }}>
+      <div style={{ display: "flex", gap: 16, marginBottom: 16, flexWrap: "wrap" }}>
+        <div className="fcard" style={{ flex: 1, minWidth: "calc(50% - 8px)" }}>
           <p style={{ fontSize: 12, color: "var(--smoke)", margin: "0 0 4px" }}>Долг перевозчиков</p>
           <p style={{ fontSize: 22, fontWeight: 600, margin: 0, color: carrierDebt > 0 ? "var(--ember,#e04)" : undefined }}>
             {money(carrierDebt)}
           </p>
         </div>
-        <div className="fcard" style={{ flex: 1 }}>
+        <div className="fcard" style={{ flex: 1, minWidth: "calc(50% - 8px)" }}>
           <p style={{ fontSize: 12, color: "var(--smoke)", margin: "0 0 4px" }}>Поступления</p>
           <p style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{money(totalIncome)}</p>
         </div>
-        <div className="fcard" style={{ flex: 1 }}>
+        <div className="fcard" style={{ flex: 1, minWidth: "calc(50% - 8px)" }}>
           <p style={{ fontSize: 12, color: "var(--smoke)", margin: "0 0 4px" }}>Списания</p>
           <p style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{money(totalExpense)}</p>
         </div>
-        <div className="fcard" style={{ flex: 1 }}>
+        <div className="fcard" style={{ flex: 1, minWidth: "calc(50% - 8px)" }}>
           <p style={{ fontSize: 12, color: "var(--smoke)", margin: "0 0 4px" }}>Сальдо</p>
           <p style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{money(carrierDebt + totalIncome - totalExpense)}</p>
         </div>
