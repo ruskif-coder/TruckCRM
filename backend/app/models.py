@@ -94,6 +94,7 @@ class TruckBase(SQLModel):
     osago_scan: str = ""
     kasko_scan: str = ""
     tech_inspection_scan: str = ""
+    moscow_pass_date: Optional[date] = None  # Пропуск Москва — дата окончания
     notes: str = ""
 
 

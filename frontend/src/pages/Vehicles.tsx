@@ -52,6 +52,7 @@ type Truck = {
   osago_scan: string;
   kasko_scan: string;
   tech_inspection_scan: string;
+  moscow_pass_date: string | null;
   notes: string;
 };
 
@@ -73,6 +74,7 @@ type TruckFormState = {
   osago_number: string;
   kasko_number: string;
   tech_inspection_number: string;
+  moscow_pass_date: string;
   notes: string;
 };
 
@@ -94,6 +96,7 @@ const EMPTY_FORM: TruckFormState = {
   osago_number: "",
   kasko_number: "",
   tech_inspection_number: "",
+  moscow_pass_date: "",
   notes: "",
 };
 
@@ -108,6 +111,7 @@ function truckToForm(t: Truck): TruckFormState {
     osago_date: t.osago_date || "",
     kasko_date: t.kasko_date || "",
     tech_inspection_date: t.tech_inspection_date || "",
+    moscow_pass_date: t.moscow_pass_date || "",
     vin: t.vin || "",
     chassis_number: t.chassis_number || "",
     pts_number: t.pts_number || "",
@@ -141,6 +145,7 @@ function toPayload(f: TruckFormState) {
     osago_number: f.osago_number,
     kasko_number: f.kasko_number,
     tech_inspection_number: f.tech_inspection_number,
+    moscow_pass_date: dateOrNull(f.moscow_pass_date),
     notes: f.notes,
   };
 }
@@ -410,6 +415,7 @@ export default function Vehicles({ tabsNav }: { tabsNav?: ReactNode } = {}) {
                     <th>ОСАГО</th>
                     <th>КАСКО</th>
                     <th>ТехОсмотр</th>
+                    <th>Пропуск МСК</th>
                     <th>Водитель</th>
                   </tr>
                 </thead>
@@ -449,6 +455,7 @@ export default function Vehicles({ tabsNav }: { tabsNav?: ReactNode } = {}) {
                       <td style={{ color: isOverdue(t.osago_date) ? "var(--bad-ink)" : undefined }}>{fmtDate(t.osago_date)}</td>
                       <td style={{ color: isOverdue(t.kasko_date) ? "var(--bad-ink)" : undefined }}>{fmtDate(t.kasko_date)}</td>
                       <td style={{ color: isOverdue(t.tech_inspection_date) ? "var(--bad-ink)" : undefined }}>{fmtDate(t.tech_inspection_date)}</td>
+                      <td style={{ color: isOverdue(t.moscow_pass_date) ? "var(--bad-ink)" : undefined }}>{fmtDate(t.moscow_pass_date)}</td>
                       <td onClick={(e) => { const s = activeSessions.get(t.id); if (s) { e.stopPropagation(); setSelectedSessionId(s.session_id); } }}>
                         {activeSessions.get(t.id) ? (
                           <button type="button" style={{
@@ -701,6 +708,19 @@ export default function Vehicles({ tabsNav }: { tabsNav?: ReactNode } = {}) {
                   onDateChange={(v) => setFieldValue("tech_inspection_date", v)}
                   onFileChange={(f) => uploadScan("tech_inspection", f)}
                   scanRef={(el) => { scanFileRefs.current.tech_inspection_scan = el; }}
+                />
+                <DocScanBlock
+                  label="Пропуск МСК"
+                  docType="moscow_pass"
+                  numberValue=""
+                  dateValue={form.moscow_pass_date}
+                  scanFilename=""
+                  uploading={false}
+                  canUpload={false}
+                  onNumberChange={() => {}}
+                  onDateChange={(v) => setFieldValue("moscow_pass_date", v)}
+                  onFileChange={() => {}}
+                  scanRef={() => {}}
                 />
               </div>
 

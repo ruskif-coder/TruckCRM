@@ -44,6 +44,7 @@ def _expiring_docs(trucks: list[models.Truck], today: date) -> list[dict]:
             ("ОСАГО", t.osago_date),
             ("Техосмотр", t.tech_inspection_date),
             ("КАСКО", t.kasko_date),
+            ("Пропуск Москва", t.moscow_pass_date),
         ]:
             if not expiry:
                 continue

@@ -473,6 +473,7 @@ def expiring_docs(session: Session = Depends(get_session)):
         ("osago_date", "ОСАГО"),
         ("kasko_date", "КАСКО"),
         ("tech_inspection_date", "Техосмотр"),
+        ("moscow_pass_date", "Пропуск Москва"),
     ]
     for truck in trucks:
         label = truck.label or truck.plate or f"Машина #{truck.id}"

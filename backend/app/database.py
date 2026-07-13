@@ -60,6 +60,8 @@ _PENDING_COLUMNS: dict[str, list[tuple[str, str, str]]] = {
         ("osago_scan", "VARCHAR", "''"),
         ("kasko_scan", "VARCHAR", "''"),
         ("tech_inspection_scan", "VARCHAR", "''"),
+        # Added 2026-07-13 — пропуск Москва (дата окончания + алерт).
+        ("moscow_pass_date", "DATE", "NULL"),
     ],
     # Added 2026-06-19 for the driver registration-card fields (see
     # models.DriverBase). `driver` rows already exist (auto-created by the
