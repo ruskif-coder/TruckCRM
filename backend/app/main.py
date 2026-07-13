@@ -34,6 +34,8 @@ from .routers import vehicle_inspections as vehicle_inspections_router
 from .routers import trip_batches, trips as trips_router, trucks as trucks_router, users as users_router
 from .routers import maintenance as maintenance_router
 from .routers import driver_transactions as driver_transactions_router
+from .routers import counterparties as counterparties_router
+from .routers import carrier_balance as carrier_balance_router
 
 protected = [Depends(get_current_user)]
 
@@ -194,6 +196,12 @@ app.include_router(maintenance_router.router, dependencies=protected)
 # Журнал транзакций водителя (2026-07-05): корректировки баланса (компенсации,
 # штрафы, авансы). Auth-only — водитель видит только свои, staff — по driver_id.
 app.include_router(driver_transactions_router.router, dependencies=protected)
+# Справочник контрагентов (2026-07-12): GET — все залогиненные, POST/PUT/DELETE — только admin.
+# Роутер не был подключён при создании — добавлен 2026-07-13 (аудит-фикс).
+app.include_router(counterparties_router.router, dependencies=protected)
+# Баланс перевозчиков (2026-07-12): финансовая сводка, только для staff.
+# Роутер не был подключён при создании — добавлен 2026-07-13 (аудит-фикс).
+app.include_router(carrier_balance_router.router, dependencies=protected)
 
 # Статические файлы фото приёмки: /photos/<filename>
 # PHOTOS_DIR задаётся env (docker-compose: /photos → ./data/photos на хосте).
