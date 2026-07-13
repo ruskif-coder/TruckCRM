@@ -7,7 +7,7 @@
  */
 import React, { useEffect, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { api, ApiError } from "../api";
+import { api, ApiError, fileUrl } from "../api";
 import { useAuth } from "../auth/AuthContext";
 import { isoDate, money } from "../lib/format";
 
@@ -1169,7 +1169,7 @@ export default function DriverDashboard() {
                   {ePhotoPaths.length > 0 && (
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                       {ePhotoPaths.map((p, i) => (
-                        <a key={i} href={`/photos/${p}`} target="_blank" rel="noreferrer"
+                        <a key={i} href={fileUrl(`/photos/${p}`)} target="_blank" rel="noreferrer"
                           style={{ fontSize: 26, textDecoration: "none", lineHeight: 1 }}>📷</a>
                       ))}
                     </div>
@@ -1264,7 +1264,7 @@ export default function DriverDashboard() {
                 {rPhotoPaths.length > 0 && (
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                     {rPhotoPaths.map((p, i) => (
-                      <a key={i} href={`/photos/${p}`} target="_blank" rel="noreferrer"
+                      <a key={i} href={fileUrl(`/photos/${p}`)} target="_blank" rel="noreferrer"
                          style={{ fontSize: 26, textDecoration: "none", lineHeight: 1 }}
                          title="Открыть фото">📷</a>
                     ))}

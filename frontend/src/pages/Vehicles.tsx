@@ -19,7 +19,7 @@
 // вместо новых полей в БД (подтверждено пользователем).
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { api, ApiError, logDownload } from "../api";
+import { api, ApiError, logDownload, fileUrl } from "../api";
 import Icon from "../components/Icon";
 
 // Дублирует backend/app/models.py::VEHICLE_TYPES/BODY_TYPES (тот же приём,
@@ -776,7 +776,7 @@ function VehInspectionView({ insp }: { insp: VInspDetail }) {
                         {it.label}
                         {it.note && <span style={{ marginLeft: 8, fontSize: 11, color: "var(--smoke)", fontStyle: "italic" }}>{it.note}</span>}
                         {it.item_count != null && <span style={{ marginLeft: 8, fontSize: 11, color: "var(--smoke)" }}>{it.item_count} шт.</span>}
-                        {cPhoto && <a href={`/photos/${cPhoto.photo_path}`} target="_blank" rel="noreferrer" style={{ marginLeft: 8, fontSize: 11, color: "var(--iris)", textDecoration: "none" }}>📷</a>}
+                        {cPhoto && <a href={fileUrl(`/photos/${cPhoto.photo_path}`)} target="_blank" rel="noreferrer" style={{ marginLeft: 8, fontSize: 11, color: "var(--iris)", textDecoration: "none" }}>📷</a>}
                       </td>
                       <td style={{ padding: "6px 4px", textAlign: "right", whiteSpace: "nowrap" }}>
                         {isClean ? (
@@ -802,7 +802,7 @@ function VehInspectionView({ insp }: { insp: VInspDetail }) {
           <div style={{ fontSize: 11, fontWeight: 700, color: "var(--smoke)", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 8 }}>Фото с 4 сторон</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
             {sidePhotos.map(d => (
-              <a key={d.id} href={`/photos/${d.photo_path}`} target="_blank" rel="noreferrer" style={{ display: "block", padding: "10px 8px", textAlign: "center", background: "var(--surface)", borderRadius: 8, border: "1px solid var(--outline)", color: "var(--iris)", fontSize: 13, textDecoration: "none", fontWeight: 600 }}>
+              <a key={d.id} href={fileUrl(`/photos/${d.photo_path}`)} target="_blank" rel="noreferrer" style={{ display: "block", padding: "10px 8px", textAlign: "center", background: "var(--surface)", borderRadius: 8, border: "1px solid var(--outline)", color: "var(--iris)", fontSize: 13, textDecoration: "none", fontWeight: 600 }}>
                 📷 {d.description.replace("4 стороны: ", "")}
               </a>
             ))}
@@ -815,7 +815,7 @@ function VehInspectionView({ insp }: { insp: VInspDetail }) {
           {regularDamages.map(d => (
             <div key={d.id} style={{ padding: "8px 10px", marginBottom: 6, background: "var(--surface)", borderRadius: 8, border: "1px solid var(--outline)" }}>
               <div style={{ fontSize: 13, color: "var(--ink)", marginBottom: d.photo_path ? 4 : 0 }}>{d.description || <span style={{ color: "var(--smoke)" }}>Без описания</span>}</div>
-              {d.photo_path && <a href={`/photos/${d.photo_path}`} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "var(--iris)", textDecoration: "none" }}>📷 Открыть фото</a>}
+              {d.photo_path && <a href={fileUrl(`/photos/${d.photo_path}`)} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "var(--iris)", textDecoration: "none" }}>📷 Открыть фото</a>}
             </div>
           ))}
         </div>
@@ -993,7 +993,7 @@ function DocScanBlock({
         {/* Ссылка скачать, если скан есть */}
         {scanFilename && (
           <a
-            href={`/truck-scans/${scanFilename}`}
+            href={fileUrl(`/truck-scans/${scanFilename}`)}
             download
             target="_blank"
             rel="noreferrer"

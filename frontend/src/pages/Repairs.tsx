@@ -3,7 +3,7 @@
  * v2 (2026-07-03): фильтр по статусу, сортировка, срочность, диалог закрытия.
  */
 import React, { useEffect, useState } from "react";
-import { api } from "../api";
+import { api, fileUrl } from "../api";
 
 type RepairRow = {
   id: number;
@@ -258,7 +258,7 @@ export default function Repairs() {
                           {photos.map((p, i) => (
                             <a
                               key={i}
-                              href={`/photos/${p}`}
+                              href={fileUrl(`/photos/${p}`)}
                               target="_blank"
                               rel="noreferrer"
                               style={{ fontSize: 18, textDecoration: "none", lineHeight: 1 }}

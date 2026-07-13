@@ -2,8 +2,9 @@ services:
   backend:
     build:
       context: ./backend
-    ports:
-      - "8000:8000"
+    # Порт 8000 НЕ публикуется в production — бэкенд доступен только внутри
+    # Docker-сети (для frontend/nginx). Проброс для локальной разработки задан
+    # в docker-compose.dev.yml (аудит безопасности 2026-07-13).
     environment:
       - DATABASE_URL=sqlite:////data/transport_crm.db
       # ──────────────────────────────────────────────────────────

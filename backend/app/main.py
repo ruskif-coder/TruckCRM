@@ -4,7 +4,6 @@ from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from sqlmodel import Session
@@ -36,6 +35,7 @@ from .routers import maintenance as maintenance_router
 from .routers import driver_transactions as driver_transactions_router
 from .routers import counterparties as counterparties_router
 from .routers import carrier_balance as carrier_balance_router
+from .routers import files as files_router
 
 protected = [Depends(get_current_user)]
 
@@ -195,17 +195,17 @@ app.include_router(counterparties_router.router, dependencies=protected)
 # Auth-only — доступен всем залогиненным пользователям.
 app.include_router(carrier_balance_router.router, dependencies=protected)
 
-# Статические файлы фото приёмки: /photos/<filename>
-# PHOTOS_DIR задаётся env (docker-compose: /photos → ./data/photos на хосте).
-_photos_dir = os.environ.get("PHOTOS_DIR", "./photos")
-os.makedirs(_photos_dir, exist_ok=True)
-app.mount("/photos", StaticFiles(directory=_photos_dir), name="photos")
+# Защищённая раздача файлов (2026-07-13, аудит безопасности 152-ФЗ).
+# Ранее StaticFiles раздавали /photos/ и /truck-scans/ публично — теперь
+# заменены на /api/files/photos/<name>?token= и /api/files/truck-scans/<name>?token=
+# с проверкой JWT в query-параметре (браузерные <img>/<a> не шлют Bearer).
+app.include_router(files_router.router)
 
-# Статические файлы скан-документов машин: /truck-scans/<filename>
-# TRUCK_SCANS_DIR задаётся env (docker-compose: /truck-scans → ./data/truck_scans).
+# Создаём папки при старте, если не существуют (поведение сохранено).
+_photos_dir = os.environ.get("PHOTOS_DIR", "./photos")
 _truck_scans_dir = os.environ.get("TRUCK_SCANS_DIR", "./truck_scans")
+os.makedirs(_photos_dir, exist_ok=True)
 os.makedirs(_truck_scans_dir, exist_ok=True)
-app.mount("/truck-scans", StaticFiles(directory=_truck_scans_dir), name="truck-scans")
 
 
 @app.get("/api/health")

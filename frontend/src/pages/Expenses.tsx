@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
-import { api, ApiError } from "../api";
+import { api, ApiError, fileUrl } from "../api";
 import FineModal from "../components/FineModal";
 import Icon from "../components/Icon";
 import MultiSelect from "../components/MultiSelect";
@@ -780,7 +780,7 @@ export default function Expenses() {
                           {photos.length > 0 ? (
                             <div style={{ display: "flex", gap: 6 }}>
                               {photos.map((p, i) => (
-                                <a key={i} href={`/photos/${p}`} target="_blank" rel="noreferrer"
+                                <a key={i} href={fileUrl(`/photos/${p}`)} target="_blank" rel="noreferrer"
                                   style={{ fontSize: 20, textDecoration: "none", lineHeight: 1 }}>📷</a>
                               ))}
                             </div>

@@ -8,6 +8,8 @@
 #   - CORS_ORIGINS: разрешает localhost:5173
 services:
   backend:
+    ports:
+      - "8000:8000"   # только для локальной разработки; в prod НЕ нужен
     volumes:
       - ./backend:/app      # исходники с хоста для hot-reload
       - ./data/db:/data

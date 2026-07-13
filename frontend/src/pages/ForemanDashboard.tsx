@@ -5,7 +5,7 @@
  */
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { api, ApiError } from "../api";
+import { api, ApiError, fileUrl } from "../api";
 import { useAuth } from "../auth/AuthContext";
 
 // ─── Типы ─────────────────────────────────────────────────────────────────────
@@ -1258,7 +1258,7 @@ export default function ForemanDashboard() {
               <div key={d.id} style={{ fontSize: 12, color: C.warn, padding: "3px 0" }}>
                 ⚠ {d.description}
                 {d.photo_path && (
-                  <a href={`/photos/${d.photo_path}`} target="_blank" rel="noreferrer" style={{ marginLeft: 6, color: C.iris }}>📷</a>
+                  <a href={fileUrl(`/photos/${d.photo_path}`)} target="_blank" rel="noreferrer" style={{ marginLeft: 6, color: C.iris }}>📷</a>
                 )}
               </div>
             ))}
@@ -1745,7 +1745,7 @@ export default function ForemanDashboard() {
                 {ePhotos.map((f, i) => (
                   <div key={f} style={{ position: "relative" }}>
                     <img
-                      src={`/photos/${f}`}
+                      src={fileUrl(`/photos/${f}`)}
                       style={{
                         width: 72, height: 72, objectFit: "cover",
                         borderRadius: 10, border: `1px solid ${C.border}`,

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { ReactNode } from "react";
-import { api, ApiError } from "../api";
+import { api, ApiError, fileUrl } from "../api";
 import { useAuth } from "../auth/AuthContext";
 import Icon from "../components/Icon";
 import MultiSelect from "../components/MultiSelect";
@@ -176,7 +176,7 @@ function InspectionView({ insp }: { insp: InspDetail }) {
                         )}
                         {cPhoto && (
                           <a
-                            href={`/photos/${cPhoto.photo_path}`}
+                            href={fileUrl(`/photos/${cPhoto.photo_path}`)}
                             target="_blank" rel="noreferrer"
                             style={{ marginLeft: 8, fontSize: 11, color: "var(--iris)", textDecoration: "none" }}
                           >📷</a>
@@ -224,7 +224,7 @@ function InspectionView({ insp }: { insp: InspDetail }) {
             {sidePhotos.map(d => (
               <a
                 key={d.id}
-                href={`/photos/${d.photo_path}`}
+                href={fileUrl(`/photos/${d.photo_path}`)}
                 target="_blank" rel="noreferrer"
                 style={{
                   display: "block", padding: "10px 8px", textAlign: "center",
@@ -259,7 +259,7 @@ function InspectionView({ insp }: { insp: InspDetail }) {
               </div>
               {d.photo_path && (
                 <a
-                  href={`/photos/${d.photo_path}`}
+                  href={fileUrl(`/photos/${d.photo_path}`)}
                   target="_blank"
                   rel="noreferrer"
                   style={{ fontSize: 12, color: "var(--iris)", textDecoration: "none" }}

@@ -146,6 +146,25 @@ export const api = {
 };
 
 /**
+ * Генерирует URL для защищённого файла (фото приёмки, скан документа).
+ *
+ * Ранее браузер открывал /photos/<name> или /truck-scans/<name> напрямую —
+ * StaticFiles без авторизации (аудит 2026-07-13, 152-ФЗ). Теперь файлы
+ * отдаются через /api/files/photos/<name>?token= и /api/files/truck-scans/...
+ * с проверкой JWT на бэкенде. Токен в query-параметре, т.к. <img src> и
+ * <a href> не умеют слать заголовок Authorization.
+ *
+ * path — строка вида "/photos/uuid.jpg" или "/truck-scans/doc.pdf"
+ */
+export function fileUrl(path: string): string {
+  const token = getToken();
+  const apiPath = `/api/files${path}`;
+  return token
+    ? `${API_URL}${apiPath}?token=${encodeURIComponent(token)}`
+    : `${API_URL}${apiPath}`;
+}
+
+/**
  * Логирует скачивание файла в журнал действий (fire-and-forget).
  * Вызывается из onClick на <a download> элементах — ошибки игнорируются,
  * чтобы не блокировать скачивание при проблемах с сетью/сессией.
