@@ -303,16 +303,20 @@ def get_active_sessions(
         )
     ).all()
 
+    is_staff = user.role in ("admin", "foreman", "accountant")
     result = []
     for s in open_sessions:
-        driver = db.get(models.Driver, s.driver_id)
-        result.append({
+        entry: dict = {
             "session_id": s.id,
             "truck_id": s.truck_id,
-            "driver_id": s.driver_id,
-            "driver_name": driver.name if driver else f"Водитель #{s.driver_id}",
             "started_at": s.started_at.isoformat(),
-        })
+        }
+        # Staff видит чьи сессии; водитель — только занятость машин (без имён коллег)
+        if is_staff:
+            driver = db.get(models.Driver, s.driver_id)
+            entry["driver_id"] = s.driver_id
+            entry["driver_name"] = driver.name if driver else f"Водитель #{s.driver_id}"
+        result.append(entry)
     return result
 
 
@@ -485,4 +489,7 @@ def get_inspection(
     insp = db.get(models.VehicleInspection, insp_id)
     if not insp:
         raise HTTPException(404)
+    # IDOR fix: водитель видит только свои акты приёмки
+    if user.role == "driver" and user.driver_id and user.driver_id != insp.driver_id:
+        raise HTTPException(403, "Доступ запрещён")
     return _inspection_detail(insp, db)
