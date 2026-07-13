@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { api, ApiError } from "../api";
 import AdvanceModal from "../components/AdvanceModal";
 import FineModal from "../components/FineModal";
+import PayoutModal from "../components/PayoutModal";
 import Icon from "../components/Icon";
 import { useAuth } from "../auth/AuthContext";
 import { money } from "../lib/format";
@@ -71,6 +72,7 @@ const TX_LABELS: Record<string, string> = {
   advance: "Аванс",
   fine_pdd: "Штраф ПДД",
   fine_company: "Штраф от компании",
+  payout: "Выплата",
 };
 
 // Минимальный набор полей перевозчика, нужный только для выбора в форме
@@ -249,6 +251,8 @@ export default function Drivers({ tabsNav }: { tabsNav?: ReactNode } = {}) {
   const [fineDriver, setFineDriver] = useState<Driver | null>(null);
   // Модалка «Выдать аванс»
   const [advanceDriver, setAdvanceDriver] = useState<Driver | null>(null);
+  // Модалка «Выплатить водителю»
+  const [payoutDriver, setPayoutDriver] = useState<Driver | null>(null);
   // Сортировка по балансу: null = по имени, "desc" = высокий баланс сверху, "asc" = низкий (долг)
   const [balanceSort, setBalanceSort] = useState<"desc" | "asc" | null>(null);
 
@@ -759,6 +763,14 @@ export default function Drivers({ tabsNav }: { tabsNav?: ReactNode } = {}) {
                     >
                       Аванс
                     </button>
+                    <button
+                      type="button"
+                      className="pill-btn"
+                      style={{ marginLeft: 4, flexShrink: 0, color: "var(--good-ink, #27ae60)" }}
+                      onClick={(e) => { e.stopPropagation(); setPayoutDriver(d); }}
+                    >
+                      Выплата
+                    </button>
                   </>
                 )}
                 {me?.role === "admin" && (
@@ -1147,6 +1159,18 @@ export default function Drivers({ tabsNav }: { tabsNav?: ReactNode } = {}) {
                 </button>
                 <button
                   type="button"
+                  className="pill-btn"
+                  style={{ color: "#fff", background: "rgba(255,255,255,.15)", borderColor: "rgba(255,255,255,.3)" }}
+                  onClick={() => {
+                    const d = ledgerDriver;
+                    setLedgerDriver(null);
+                    setPayoutDriver(d);
+                  }}
+                >
+                  Выплата
+                </button>
+                <button
+                  type="button"
                   onClick={() => setLedgerDriver(null)}
                   style={{ background: "none", border: "none", color: "#fff", fontSize: 22, cursor: "pointer", lineHeight: 1 }}
                 >
@@ -1247,6 +1271,22 @@ export default function Drivers({ tabsNav }: { tabsNav?: ReactNode } = {}) {
           onClose={() => setAdvanceDriver(null)}
           onSaved={(did) => {
             setAdvanceDriver(null);
+            void loadBalances();
+            if (ledgerDriver?.id === did) {
+              void openLedger(ledgerDriver);
+            }
+          }}
+        />
+      )}
+
+      {/* Модалка: выплатить водителю */}
+      {payoutDriver && (
+        <PayoutModal
+          drivers={drivers}
+          defaultDriverId={payoutDriver.id}
+          onClose={() => setPayoutDriver(null)}
+          onSaved={(did) => {
+            setPayoutDriver(null);
             void loadBalances();
             if (ledgerDriver?.id === did) {
               void openLedger(ledgerDriver);

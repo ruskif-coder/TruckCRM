@@ -35,10 +35,10 @@ router = APIRouter(prefix="/api/driver-transactions", tags=["driver-transactions
 _STAFF_ROLES = {"admin", "foreman", "accountant"}
 
 # Типы, создаваемые вручную через этот эндпойнт (остальные — системные)
-_MANUAL_TYPES = {"advance", "fine_pdd", "fine_company"}
+_MANUAL_TYPES = {"advance", "fine_pdd", "fine_company", "payout"}
 
-# Типы, для которых amount хранится как отрицательное (удержание)
-_DEBIT_TYPES = {"advance", "fine_pdd", "fine_company"}
+# Типы, для которых amount хранится как отрицательное (удержание/выплата)
+_DEBIT_TYPES = {"advance", "fine_pdd", "fine_company", "payout"}
 
 
 def _require_staff(user: models.User) -> None:

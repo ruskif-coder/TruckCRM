@@ -948,6 +948,7 @@ export default function DriverDashboard() {
                 advance:      "Аванс",
                 fine_pdd:     "Штраф ПДД",
                 fine_company: "Штраф от компании",
+                payout:       "Выплата",
               };
               const txList = txData?.transactions ?? [];
               return (
