@@ -535,7 +535,7 @@ function WeeklyBreakdown() {
 
       {data && data.weeks.length > 0 && grand && (
         <div className="fcard">
-          <div style={{ overflowX: "auto" }}>
+          <div className="tbl-scroll">
             <table>
               <thead>
                 <tr>

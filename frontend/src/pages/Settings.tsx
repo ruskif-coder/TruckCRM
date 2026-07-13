@@ -240,7 +240,7 @@ function RolesTab({ tabsNav }: { tabsNav?: ReactNode }) {
         {loading ? (
           <p style={{ color: "var(--ink-3)", padding: "20px 24px" }}>Загрузка...</p>
         ) : (
-          <div style={{ overflowX: "auto", padding: "16px 20px" }}>
+          <div className="tbl-scroll" style={{ padding: "16px 20px" }}>
             <table>
               <thead>
                 <tr>
@@ -426,7 +426,7 @@ function LogTab({ tabsNav }: { tabsNav?: ReactNode }) {
         ) : entries.length === 0 ? (
           <p style={{ color: "var(--ink-3)", padding: "20px 24px" }}>Записей пока нет.</p>
         ) : (
-          <div style={{ overflowX: "auto", padding: "16px 20px" }}>
+          <div className="tbl-scroll" style={{ padding: "16px 20px" }}>
             <table>
               <thead>
                 <tr>

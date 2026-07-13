@@ -228,7 +228,7 @@ export function UsersTable({ tabsNav }: { tabsNav?: ReactNode } = {}) {
         ) : users.length === 0 ? (
           <p style={{ color: "var(--ink-3)", padding: "20px 24px" }}>Пока нет пользователей.</p>
         ) : (
-          <div style={{ overflowX: "auto", padding: "16px 20px" }}>
+          <div className="tbl-scroll" style={{ padding: "16px 20px" }}>
             <table>
               <thead>
                 <tr>

@@ -189,7 +189,7 @@ export default function Repairs() {
             {filterStatus === "все" ? "Заявок на ремонт нет." : "Нет заявок с таким статусом."}
           </p>
         ) : (
-          <div style={{ overflowX: "auto" }}>
+          <div className="tbl-scroll">
             <table>
               <thead>
                 <tr>

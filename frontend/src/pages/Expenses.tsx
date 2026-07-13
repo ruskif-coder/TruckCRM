@@ -1160,7 +1160,7 @@ export default function Expenses() {
           <p style={{ color: "var(--smoke)" }}>Нет операций, соответствующих текущим фильтрам.</p>
         ) : (
           <>
-            <div style={{ overflowX: "auto" }}>
+            <div className="tbl-scroll">
               <table>
                 <thead>
                   <tr>

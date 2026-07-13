@@ -510,6 +510,20 @@ html, body, #root { height: 100%; }
 /* mobile bottom nav (hidden desktop) */
 .botnav { display: none; }
 
+/* Таблица с индикатором горизонтальной прокрутки.
+   Техника background-attachment:local/scroll рисует тень у правого края
+   только когда есть что прокручивать вправо (и у левого — при скролле).
+   var(--surface) маскирует градиент у краёв без скролла. */
+.tbl-scroll {
+  overflow-x: auto;
+  background:
+    linear-gradient(to right, var(--surface, #fff) 20%, transparent) left / 28px 100% no-repeat,
+    linear-gradient(to left,  var(--surface, #fff) 20%, transparent) right / 28px 100% no-repeat,
+    linear-gradient(to right, rgba(0,0,0,.06), transparent) left / 12px 100% no-repeat,
+    linear-gradient(to left,  rgba(0,0,0,.06), transparent) right / 12px 100% no-repeat;
+  background-attachment: local, local, scroll, scroll;
+}
+
 /* ---------- Responsive ---------- */
 @media (max-width: 1180px) {
   .grid {
@@ -533,13 +547,17 @@ html, body, #root { height: 100%; }
   .botnav {
     display: flex; position: fixed; bottom: 0; left: 0; right: 0; z-index: 40;
     background: var(--surface); box-shadow: 0 -2px 20px rgba(0, 0, 0, 0.35);
-    padding: 10px 8px calc(10px + env(safe-area-inset-bottom)); justify-content: space-around;
+    padding: 10px 4px calc(10px + env(safe-area-inset-bottom)); justify-content: space-around;
   }
-  .botnav .bn { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 14px; border-radius: 14px; color: var(--ink-3); font-weight: 700; font-size: 0.68rem; min-width: 64px; background: none; }
-  .botnav .bn svg { width: 24px; height: 24px; }
+  /* min-width:0 чтобы не переполнять боковую навигацию при 7+ пунктах */
+  .botnav .bn { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 5px 8px; border-radius: 12px; color: var(--ink-3); font-weight: 700; font-size: 0.62rem; min-width: 0; flex: 1; background: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .botnav .bn svg { width: 22px; height: 22px; flex-shrink: 0; }
   .botnav .bn.active { color: var(--ink); background: var(--surface-2); }
   .pagetitle { font-size: 2.3rem; }
   .head-actions .lbl-hide { display: none; }
+  /* Комфортный tap-target: строки таблиц чуть выше на мобиле */
+  td { padding: 14px 8px; }
+  th { padding: 8px 8px; }
 }
 
 /* ══════════════════════════════════════════════════════════════

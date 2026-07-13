@@ -469,7 +469,7 @@ function HandoverJournal({ tabsNav }: { tabsNav?: ReactNode }) {
         ) : sessions.length === 0 ? (
           <p style={{ color: "var(--smoke)" }}>Нет записей. Акты приёмки-сдачи будут отображаться здесь.</p>
         ) : (
-          <div style={{ overflowX: "auto" }}>
+          <div className="tbl-scroll">
             <p style={{ fontSize: 12, color: "var(--smoke)", margin: "0 0 10px" }}>
               Нажмите на строку, чтобы открыть полный акт с чеклистом и повреждениями
             </p>
@@ -1118,7 +1118,7 @@ export default function Trips() {
           <p style={{ color: "var(--smoke)" }}>Нет поездок, соответствующих текущим фильтрам.</p>
         ) : (
           <>
-            <div style={{ overflowX: "auto" }}>
+            <div className="tbl-scroll">
               <table>
                 <thead>
                   <tr>

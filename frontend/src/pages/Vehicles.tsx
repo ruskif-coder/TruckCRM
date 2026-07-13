@@ -398,7 +398,7 @@ export default function Vehicles({ tabsNav }: { tabsNav?: ReactNode } = {}) {
           ) : sorted.length === 0 ? (
             <p style={{ color: "var(--ink-3)", padding: "20px 24px" }}>Ничего не найдено.</p>
           ) : (
-            <div style={{ overflowX: "auto", padding: "16px 20px" }}>
+            <div className="tbl-scroll" style={{ padding: "16px 20px" }}>
               <table>
                 <thead>
                   <tr>

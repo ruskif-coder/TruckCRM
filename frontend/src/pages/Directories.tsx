@@ -278,7 +278,7 @@ function CarriersTab({ tabsNav }: { tabsNav?: ReactNode }) {
         ) : carriers.length === 0 ? (
           <p style={{ color: "var(--ink-3)", padding: "20px 24px" }}>Пока нет перевозчиков. Добавьте первого.</p>
         ) : (
-          <div style={{ overflowX: "auto", padding: "16px 20px" }}>
+          <div className="tbl-scroll" style={{ padding: "16px 20px" }}>
             <table>
               <thead>
                 <tr>
@@ -538,7 +538,7 @@ function CounterpartiesTab({ tabsNav }: { tabsNav?: ReactNode }) {
         ) : list.length === 0 ? (
           <p style={{ color: "var(--ink-3)", padding: "20px 24px" }}>Нет контрагентов. Добавьте первого.</p>
         ) : (
-          <div style={{ overflowX: "auto", padding: "16px 20px" }}>
+          <div className="tbl-scroll" style={{ padding: "16px 20px" }}>
             <table>
               <thead>
                 <tr>

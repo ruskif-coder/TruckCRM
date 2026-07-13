@@ -407,7 +407,7 @@ export default function Mileage({ tabsNav }: { tabsNav?: ReactNode } = {}) {
           <p style={{ color: "var(--smoke)" }}>Нет записей, соответствующих текущим фильтрам.</p>
         ) : (
           <>
-            <div style={{ overflowX: "auto" }}>
+            <div className="tbl-scroll">
               <table>
                 <thead>
                   <tr>

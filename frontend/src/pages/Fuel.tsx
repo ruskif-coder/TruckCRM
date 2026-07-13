@@ -592,7 +592,7 @@ export default function Fuel({ tabsNav }: { tabsNav?: ReactNode } = {}) {
               </div>
             )}
 
-            <div style={{ overflowX: "auto" }}>
+            <div className="tbl-scroll">
               <table>
                 <thead>
                   <tr>

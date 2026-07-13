@@ -219,7 +219,7 @@ function CarriersTab() {
 
       {rows && rows.length > 0 && (
         <div className="fcard">
-          <div style={{ overflowX: "auto" }}>
+          <div className="tbl-scroll">
             <table>
               <thead>
                 <tr>
@@ -583,7 +583,7 @@ export default function Reports() {
 
               {sortedRows.length > 0 && (
                 <div className="fcard">
-                  <div style={{ overflowX: "auto" }}>
+                  <div className="tbl-scroll">
                     <table>
                       <thead>
                         <tr>
