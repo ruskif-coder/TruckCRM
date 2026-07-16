@@ -74,6 +74,7 @@ type TruckFormState = {
   osago_number: string;
   kasko_number: string;
   tech_inspection_number: string;
+  moscow_pass_number: string;
   moscow_pass_date: string;
   notes: string;
 };
@@ -96,6 +97,7 @@ const EMPTY_FORM: TruckFormState = {
   osago_number: "",
   kasko_number: "",
   tech_inspection_number: "",
+  moscow_pass_number: "",
   moscow_pass_date: "",
   notes: "",
 };
@@ -120,6 +122,7 @@ function truckToForm(t: Truck): TruckFormState {
     osago_number: t.osago_number || "",
     kasko_number: t.kasko_number || "",
     tech_inspection_number: t.tech_inspection_number || "",
+    moscow_pass_number: "",
     notes: t.notes || "",
   };
 }
@@ -712,12 +715,12 @@ export default function Vehicles({ tabsNav }: { tabsNav?: ReactNode } = {}) {
                 <DocScanBlock
                   label="Пропуск МСК"
                   docType="moscow_pass"
-                  numberValue=""
+                  numberValue={form.moscow_pass_number}
                   dateValue={form.moscow_pass_date}
                   scanFilename=""
                   uploading={false}
-                  canUpload={false}
-                  onNumberChange={() => {}}
+                  canUpload={!!editingId}
+                  onNumberChange={(v) => setFieldValue("moscow_pass_number", v)}
                   onDateChange={(v) => setFieldValue("moscow_pass_date", v)}
                   onFileChange={() => {}}
                   scanRef={() => {}}
@@ -947,20 +950,27 @@ function DocScanBlock({
   scanRef: (el: HTMLInputElement | null) => void;
 }) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const iconBtn: React.CSSProperties = {
+    width: 36, height: 36, borderRadius: "50%", border: "none",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    cursor: "pointer", flexShrink: 0, transition: "opacity .15s",
+  };
   return (
     <div style={{
-      display: "flex", flexWrap: "wrap", gap: 10, alignItems: "flex-end",
+      display: "grid",
+      gridTemplateColumns: "80px 1fr 150px 36px 36px",
+      gap: 10, alignItems: "end",
       padding: "10px 12px", background: "var(--surface)", borderRadius: 10,
       border: "1px solid var(--border)", marginBottom: 8,
     }}>
       {/* Метка */}
-      <div style={{ width: 90, flexShrink: 0 }}>
-        <div style={{ fontSize: 11, color: "var(--ink-3)", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 4 }}>
+      <div style={{ paddingBottom: 6 }}>
+        <div style={{ fontSize: 11, color: "var(--ink-3)", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4 }}>
           {label}
         </div>
       </div>
       {/* Номер */}
-      <div style={{ flex: "2 1 140px" }}>
+      <div>
         <label className="label" style={{ fontSize: 11 }}>Номер</label>
         <input
           type="text"
@@ -971,7 +981,7 @@ function DocScanBlock({
         />
       </div>
       {/* Дата окончания */}
-      <div style={{ flex: "1 1 130px" }}>
+      <div>
         <label className="label" style={{ fontSize: 11 }}>Дата окончания</label>
         <input
           type="date"
@@ -980,9 +990,8 @@ function DocScanBlock({
           onChange={(e) => onDateChange(e.target.value)}
         />
       </div>
-      {/* Скан */}
-      <div style={{ flexShrink: 0, display: "flex", gap: 6, alignItems: "center" }}>
-        {/* Скрытый file input */}
+      {/* Прикрепить скан */}
+      <div style={{ display: "flex", alignItems: "flex-end" }}>
         <input
           type="file"
           accept=".jpg,.jpeg,.png,.pdf,.webp"
@@ -993,35 +1002,72 @@ function DocScanBlock({
             if (f) { onFileChange(f); e.target.value = ""; }
           }}
         />
-        {/* Кнопка загрузки */}
         {canUpload ? (
           <button
             type="button"
-            className="pill-btn"
             disabled={uploading}
             onClick={() => fileInputRef.current?.click()}
-            title="Прикрепить скан"
-            style={{ fontSize: 12 }}
+            title={scanFilename ? "Заменить скан" : "Прикрепить скан"}
+            style={{
+              ...iconBtn,
+              background: "var(--surface)",
+              border: "1.5px solid var(--border)",
+              color: uploading ? "var(--ink-3)" : "var(--ink)",
+              opacity: uploading ? 0.5 : 1,
+            }}
           >
-            {uploading ? "Загрузка..." : scanFilename ? "Заменить скан" : "📎 Прикрепить скан"}
+            {uploading ? (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/></svg>
+            ) : (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+              </svg>
+            )}
           </button>
         ) : (
-          <span style={{ fontSize: 11, color: "var(--ink-3)", fontStyle: "italic" }}>
-            Сохраните карточку
-          </span>
+          <div style={{ width: 36, height: 36 }} />
         )}
-        {/* Ссылка скачать, если скан есть */}
-        {scanFilename && (
+      </div>
+      {/* Скачать */}
+      <div style={{ display: "flex", alignItems: "flex-end" }}>
+        {scanFilename ? (
           <a
             href={fileUrl(`/truck-scans/${scanFilename}`)}
             download
             target="_blank"
             rel="noreferrer"
-            style={{ fontSize: 12, color: "var(--iris)", fontWeight: 600 }}
+            title="Скачать скан"
             onClick={() => logDownload(scanFilename, "documents")}
+            style={{
+              ...iconBtn,
+              background: "var(--dark, #1a1a2e)",
+              color: "var(--on-dark, #fff)",
+              textDecoration: "none",
+            }}
           >
-            ↓ Скачать
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
           </a>
+        ) : (
+          <div
+            title="Нет прикреплённого документа"
+            style={{
+              ...iconBtn,
+              background: "var(--surface-2, #f0f0f0)",
+              color: "var(--ink-3)",
+              cursor: "default",
+              opacity: 0.4,
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+          </div>
         )}
       </div>
     </div>
