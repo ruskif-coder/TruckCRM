@@ -290,6 +290,29 @@ def create_transaction(
         )
         session.add(cash_entry)
 
+    # Выплата водителю → фиксируем расход в реестре расходов (статья "Расчёт с водителем")
+    if payload.tx_type == "payout":
+        driver = session.get(models.Driver, payload.driver_id)
+        driver_name = driver.name if driver else f"водитель #{payload.driver_id}"
+        desc = (payload.description or "").strip()
+        purpose = f"Расчёт с водителем — {driver_name}"
+        if desc:
+            purpose = f"{purpose}: {desc}"
+        cash_entry = models.CashFlowEntry(
+            date=payload.date,
+            expense=payload.amount,
+            income=0.0,
+            category="Расчёт с водителем",
+            purpose=purpose,
+            driver_id=payload.driver_id,
+            truck_id=None,
+            status="ОПЛАЧЕНО",
+            bank="",
+            counterparty="",
+            period=payload.date.strftime("%m-%Y"),
+        )
+        session.add(cash_entry)
+
     session.commit()
     session.refresh(tx)
     return tx

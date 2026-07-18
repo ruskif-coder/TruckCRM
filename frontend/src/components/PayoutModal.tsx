@@ -24,18 +24,19 @@ function driverFullName(d: Driver): string {
 type Props = {
   drivers: Driver[];
   defaultDriverId?: number | null;
+  defaultAmount?: number;
   onClose: () => void;
   /** Вызывается после успешного сохранения. Передаёт driver_id */
   onSaved: (driverId: number) => void;
 };
 
-export default function PayoutModal({ drivers, defaultDriverId, onClose, onSaved }: Props) {
+export default function PayoutModal({ drivers, defaultDriverId, defaultAmount, onClose, onSaved }: Props) {
   const today = isoDate(new Date());
   const [driverId, setDriverId] = useState<string>(
     defaultDriverId ? String(defaultDriverId) : ""
   );
   const [date, setDate] = useState(today);
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState(defaultAmount && defaultAmount > 0 ? String(defaultAmount) : "");
   const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);

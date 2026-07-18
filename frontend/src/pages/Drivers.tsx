@@ -1284,6 +1284,7 @@ export default function Drivers({ tabsNav }: { tabsNav?: ReactNode } = {}) {
         <PayoutModal
           drivers={drivers}
           defaultDriverId={payoutDriver.id}
+          defaultAmount={Math.max(0, balanceMap[payoutDriver.id] ?? 0)}
           onClose={() => setPayoutDriver(null)}
           onSaved={(did) => {
             setPayoutDriver(null);
