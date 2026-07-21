@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { api, ApiError } from "../api";
 import AdvanceModal from "../components/AdvanceModal";
+import BonusModal from "../components/BonusModal";
 import FineModal from "../components/FineModal";
 import PayoutModal from "../components/PayoutModal";
 import Icon from "../components/Icon";
@@ -73,6 +74,7 @@ const TX_LABELS: Record<string, string> = {
   fine_pdd: "Штраф ПДД",
   fine_company: "Штраф от компании",
   payout: "Выплата",
+  bonus: "Премия",
 };
 
 // Минимальный набор полей перевозчика, нужный только для выбора в форме
@@ -251,6 +253,8 @@ export default function Drivers({ tabsNav }: { tabsNav?: ReactNode } = {}) {
   const [fineDriver, setFineDriver] = useState<Driver | null>(null);
   // Модалка «Выдать аванс»
   const [advanceDriver, setAdvanceDriver] = useState<Driver | null>(null);
+  // Модалка «Начислить премию»
+  const [bonusDriver, setBonusDriver] = useState<Driver | null>(null);
   // Модалка «Выплатить водителю»
   const [payoutDriver, setPayoutDriver] = useState<Driver | null>(null);
   // Сортировка по балансу: null = по имени, "desc" = высокий баланс сверху, "asc" = низкий (долг)
@@ -692,6 +696,7 @@ export default function Drivers({ tabsNav }: { tabsNav?: ReactNode } = {}) {
             return (
               <div key={d.id} className="drow" onClick={() => openEdit(d)} style={{ cursor: "pointer" }}>
                 <div className="dav">{initials(d)}</div>
+                {/* Имя + телефон */}
                 <div className="dinfo">
                   <div className="dname" style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                     {fullName(d)}
@@ -705,88 +710,92 @@ export default function Drivers({ tabsNav }: { tabsNav?: ReactNode } = {}) {
                   </div>
                   <div className="dsub">{d.phone || "телефон не указан"}</div>
                 </div>
-                <div className="dstat">
-                  <div className="ds" style={{ width: 72, minWidth: 72, textAlign: "center" }}>
+
+                {/* Статистика — фиксированные колонки одинаковой высоты */}
+                <div style={{ display: "flex", alignItems: "center", gap: 0, flexShrink: 0 }}>
+                  <div style={{ width: 68, textAlign: "center" }}>
                     <div className="n">{stats.total}</div>
-                    <div className="l">рейсов всего</div>
+                    <div className="l">всего</div>
                   </div>
-                  <div className="ds" style={{ width: 72, minWidth: 72, textAlign: "center" }}>
+                  <div style={{ width: 68, textAlign: "center" }}>
                     <div className="n">{stats.week}</div>
-                    <div className="l" title={`пн–вс ${lastWeekLabel}`}>за неделю</div>
-                    <div style={{ fontSize: 9, color: "var(--ink-3)", lineHeight: 1.2 }}>{lastWeekLabel}</div>
+                    <div className="l" title={`пн–вс ${lastWeekLabel}`}>неделя</div>
                   </div>
-                  {/* Баланс — кликабелен → открывает выписку */}
+                  {/* Баланс — кликабелен → выписка */}
                   <div
-                    className="ds"
                     onClick={(e) => { e.stopPropagation(); void openLedger(d); }}
-                    style={{ width: 120, minWidth: 120, textAlign: "center", cursor: "pointer", userSelect: "none" }}
+                    style={{ width: 116, textAlign: "center", cursor: "pointer", userSelect: "none" }}
                     title="Нажмите для детализации баланса"
                   >
-                    <div
-                      className="n"
-                      style={{
-                        color:
-                          balanceMap[d.id] != null
-                            ? balanceMap[d.id] < 0
-                              ? "var(--ember, #e74c3c)"
-                              : "var(--iris, #6366f1)"
-                            : "var(--ink-3)",
-                        fontSize: 13,
-                        whiteSpace: "nowrap",
-                      }}
-                    >
+                    <div className="n" style={{
+                      fontSize: "1.1rem", whiteSpace: "nowrap",
+                      color: balanceMap[d.id] != null
+                        ? balanceMap[d.id] < 0 ? "var(--ember, #e74c3c)" : "var(--iris, #6366f1)"
+                        : "var(--ink-3)",
+                    }}>
                       {balanceMap[d.id] != null ? money(balanceMap[d.id]) : "—"}
                     </div>
                     <div className="l">баланс ↗</div>
                   </div>
                 </div>
-                <span className={`status ${d.active ? "st-route" : "st-free"}`}>
+
+                {/* Статус — фиксированная ширина чтобы "Активен" и "Неактивен" одинаковые */}
+                <span className={`status ${d.active ? "st-route" : "st-free"}`}
+                  style={{ flexShrink: 0, width: 98, justifyContent: "center" }}>
                   <span className="sd" />
                   {d.active ? "Активен" : "Неактивен"}
                 </span>
-                {/* Кнопки «Штраф» и «Аванс» для staff */}
-                {(me?.role === "admin" || me?.role === "foreman" || me?.role === "accountant") && (
-                  <>
-                    <button
-                      type="button"
-                      className="pill-btn"
-                      style={{ marginLeft: 8, flexShrink: 0, color: "var(--ember, #e74c3c)" }}
-                      onClick={(e) => { e.stopPropagation(); setFineDriver(d); }}
-                    >
-                      Штраф
+
+                {/* Иконочные кнопки действий */}
+                <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
+                  {(me?.role === "admin" || me?.role === "foreman" || me?.role === "accountant") && (<>
+                    {/* Штраф */}
+                    <button type="button" title="Штраф" className="icon-action-btn" style={{ color: "var(--ember, #e74c3c)" }}
+                      onClick={() => setFineDriver(d)}>
+                      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" width="16" height="16">
+                        <path d="M10 3L2 17h16L10 3z" strokeLinejoin="round"/>
+                        <path d="M10 8v4M10 14.5v.5" strokeLinecap="round"/>
+                      </svg>
                     </button>
-                    <button
-                      type="button"
-                      className="pill-btn"
-                      style={{ marginLeft: 4, flexShrink: 0 }}
-                      onClick={(e) => { e.stopPropagation(); setAdvanceDriver(d); }}
-                    >
-                      Аванс
+                    {/* Аванс */}
+                    <button type="button" title="Аванс" className="icon-action-btn"
+                      onClick={() => setAdvanceDriver(d)}>
+                      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" width="16" height="16">
+                        <rect x="2" y="5" width="16" height="11" rx="2"/>
+                        <path d="M2 8h16M7 12h2" strokeLinecap="round"/>
+                      </svg>
                     </button>
-                    <button
-                      type="button"
-                      className="pill-btn"
-                      style={{ marginLeft: 4, flexShrink: 0, color: "var(--good-ink, #27ae60)" }}
-                      onClick={(e) => { e.stopPropagation(); setPayoutDriver(d); }}
-                    >
-                      Выплата
+                    {/* Премия */}
+                    <button type="button" title="Премия" className="icon-action-btn" style={{ color: "#f59e0b" }}
+                      onClick={() => setBonusDriver(d)}>
+                      <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16">
+                        <path d="M10 2l2.09 4.26L17 7.27l-3.5 3.41.83 4.82L10 13.27l-4.33 2.23.83-4.82L3 7.27l4.91-.71L10 2z"/>
+                      </svg>
                     </button>
-                  </>
-                )}
-                {me?.role === "admin" && (
-                  <button
-                    type="button"
-                    className="pill-btn"
-                    style={{ marginLeft: 8, flexShrink: 0 }}
-                    disabled={accountBusyId === d.id}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleCreateAccount(d);
-                    }}
-                  >
-                    {accountBusyId === d.id ? "..." : driverAccountIds.has(d.id) ? "Сбросить пароль" : "Создать аккаунт"}
-                  </button>
-                )}
+                    {/* Выплата */}
+                    <button type="button" title="Выплата" className="icon-action-btn" style={{ color: "var(--good-ink, #27ae60)" }}
+                      onClick={() => setPayoutDriver(d)}>
+                      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" width="16" height="16">
+                        <path d="M10 14V4M6 8l4-4 4 4" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M4 17h12" strokeLinecap="round"/>
+                      </svg>
+                    </button>
+                  </>)}
+                  {me?.role === "admin" && (
+                    <button type="button"
+                      title={driverAccountIds.has(d.id) ? "Сбросить пароль" : "Создать аккаунт"}
+                      className="icon-action-btn"
+                      disabled={accountBusyId === d.id}
+                      onClick={() => handleCreateAccount(d)}>
+                      {accountBusyId === d.id
+                        ? <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" width="16" height="16"><circle cx="10" cy="10" r="7" strokeDasharray="4 2"/></svg>
+                        : driverAccountIds.has(d.id)
+                          ? <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" width="16" height="16"><path d="M4 10.5A5.5 5.5 0 0115.5 6M16 10.5A5.5 5.5 0 014.5 15M12 4l2 2-2 2M8 16l-2-2 2-2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                          : <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" width="16" height="16"><circle cx="9" cy="7" r="4"/><path d="M2 17c0-3.3 3.1-6 7-6M15 12v5M12.5 14.5h5" strokeLinecap="round"/></svg>
+                      }
+                    </button>
+                  )}
+                </div>
               </div>
             );
           })}
@@ -1271,6 +1280,22 @@ export default function Drivers({ tabsNav }: { tabsNav?: ReactNode } = {}) {
           onClose={() => setAdvanceDriver(null)}
           onSaved={(did) => {
             setAdvanceDriver(null);
+            void loadBalances();
+            if (ledgerDriver?.id === did) {
+              void openLedger(ledgerDriver);
+            }
+          }}
+        />
+      )}
+
+      {/* Модалка: начислить премию */}
+      {bonusDriver && (
+        <BonusModal
+          drivers={drivers}
+          defaultDriverId={bonusDriver.id}
+          onClose={() => setBonusDriver(null)}
+          onSaved={(did) => {
+            setBonusDriver(null);
             void loadBalances();
             if (ledgerDriver?.id === did) {
               void openLedger(ledgerDriver);

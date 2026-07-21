@@ -35,7 +35,7 @@ router = APIRouter(prefix="/api/driver-transactions", tags=["driver-transactions
 _STAFF_ROLES = {"admin", "foreman", "accountant"}
 
 # Типы, создаваемые вручную через этот эндпойнт (остальные — системные)
-_MANUAL_TYPES = {"advance", "fine_pdd", "fine_company", "payout"}
+_MANUAL_TYPES = {"advance", "fine_pdd", "fine_company", "payout", "bonus"}
 
 # Типы, для которых amount хранится как отрицательное (удержание/выплата)
 _DEBIT_TYPES = {"advance", "fine_pdd", "fine_company", "payout"}
