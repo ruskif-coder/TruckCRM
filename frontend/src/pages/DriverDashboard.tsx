@@ -7,9 +7,14 @@
  */
 import React, { useEffect, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
+import imageCompression from "browser-image-compression";
 import { api, ApiError, fileUrl } from "../api";
 import { useAuth } from "../auth/AuthContext";
 import { isoDate, money } from "../lib/format";
+
+async function compressPhoto(file: File): Promise<File> {
+  return imageCompression(file, { maxSizeMB: 1.5, maxWidthOrHeight: 1920, useWebWorker: true });
+}
 
 // ---------- Типы ----------
 type Summary = {
@@ -1523,7 +1528,8 @@ function HandoverSheet({ trucks, activeSession, driverId, onClose, onDone }: Han
   async function uploadPhoto(dmgId: string, file: File) {
     setUploadingDmgId(dmgId);
     try {
-      const res = await api.upload<{ filename: string }>("/api/vehicle-inspections/photo", file);
+      const compressed = await compressPhoto(file);
+      const res = await api.upload<{ filename: string }>("/api/vehicle-inspections/photo", compressed);
       setDamages(prev => prev.map(d =>
         d.id === dmgId ? { ...d, photoFile: file, photoPath: res.filename } : d
       ));
@@ -1541,7 +1547,8 @@ function HandoverSheet({ trucks, activeSession, driverId, onClose, onDone }: Han
   ) {
     setItems(prev => prev.map((it, i) => i === idx ? { ...it, photoUploading: true } : it));
     try {
-      const res = await api.upload<{ filename: string }>("/api/vehicle-inspections/photo", file);
+      const compressed = await compressPhoto(file);
+      const res = await api.upload<{ filename: string }>("/api/vehicle-inspections/photo", compressed);
       setItems(prev => prev.map((it, i) => i === idx ? { ...it, photoPath: res.filename, photoUploading: false } : it));
     } catch {
       setItems(prev => prev.map((it, i) => i === idx ? { ...it, photoUploading: false } : it));
@@ -1552,7 +1559,8 @@ function HandoverSheet({ trucks, activeSession, driverId, onClose, onDone }: Han
   async function uploadCleanPhoto(idx: number, file: File) {
     setCleanItems(prev => prev.map((it, i) => i === idx ? { ...it, uploading: true } : it));
     try {
-      const res = await api.upload<{ filename: string }>("/api/vehicle-inspections/photo", file);
+      const compressed = await compressPhoto(file);
+      const res = await api.upload<{ filename: string }>("/api/vehicle-inspections/photo", compressed);
       setCleanItems(prev => prev.map((it, i) => i === idx ? { ...it, photoPath: res.filename, uploading: false } : it));
     } catch {
       setCleanItems(prev => prev.map((it, i) => i === idx ? { ...it, uploading: false } : it));
@@ -1563,10 +1571,12 @@ function HandoverSheet({ trucks, activeSession, driverId, onClose, onDone }: Han
   async function uploadSidePhoto(idx: number, file: File) {
     setSidePhotos(prev => prev.map((sp, i) => i === idx ? { ...sp, uploading: true } : sp));
     try {
-      const res = await api.upload<{ filename: string }>("/api/vehicle-inspections/photo", file);
+      const compressed = await compressPhoto(file);
+      const res = await api.upload<{ filename: string }>("/api/vehicle-inspections/photo", compressed);
       setSidePhotos(prev => prev.map((sp, i) => i === idx ? { ...sp, photoPath: res.filename, uploading: false } : sp));
     } catch {
       setSidePhotos(prev => prev.map((sp, i) => i === idx ? { ...sp, uploading: false } : sp));
+      setSubmitError("Не удалось загрузить фото — нет связи. Попробуйте ещё раз.");
     }
   }
 
