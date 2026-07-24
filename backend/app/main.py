@@ -36,6 +36,7 @@ from .routers import maintenance as maintenance_router
 from .routers import driver_transactions as driver_transactions_router
 from .routers import counterparties as counterparties_router
 from .routers import carrier_balance as carrier_balance_router
+from .routers import files as files_router
 
 protected = [Depends(get_current_user)]
 
@@ -91,6 +92,7 @@ app.add_middleware(
 
 # Public — no auth required.
 app.include_router(auth_router.router)
+app.include_router(files_router.router)  # токен передаётся как query-param
 
 # Everything below requires a valid bearer token (login). Per-role
 # enforcement (2026-06-28, "Разделение по зонам", переведено на
