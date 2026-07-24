@@ -238,7 +238,10 @@ def weekly_pnl(
     in_range = [
         t for t in trips
         if trip_in_range(t, date_from, date_to)
-        and not (t.status or "").lower().startswith("отмен")
+        and (
+            not (t.status or "").lower().startswith("отмен")
+            or (t.fines or 0) > 0  # отменённые со штрафом всё равно включаем
+        )
     ]
 
     # Топливо из реестра расходов (CashFlowEntry, category="Топливо") — единый

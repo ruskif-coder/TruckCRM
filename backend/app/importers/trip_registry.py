@@ -289,6 +289,10 @@ def import_trips(file_bytes: bytes, session: Session, source: str = "", carrier_
         trip = existing.get(request_number)
         if trip:
             for k, v in fields.items():
+                # Не затираем ненулевую выручку/штраф нулём из следующей выгрузки:
+                # штрафы приходят позже отдельным файлом где amount=0, и наоборот.
+                if k in ("amount", "fines") and (v or 0) == 0 and (getattr(trip, k) or 0) > 0:
+                    continue
                 setattr(trip, k, v)
             trips_updated += 1
         else:
