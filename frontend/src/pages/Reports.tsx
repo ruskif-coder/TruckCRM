@@ -43,7 +43,7 @@ type SortKey =
   | "fuel"
   | "driver_pct"
   | "driver_payout"
-  | "driver_balance"
+  | "trip_fines"
   | "profit"
   | "profitability"
   | "price_per_trip"
@@ -82,7 +82,7 @@ const COLUMNS: { key: SortKey; label: string }[] = [
   { key: "fuel", label: "Топливо" },
   { key: "driver_pct", label: "% водит." },
   { key: "driver_payout", label: "Выплата водителю" },
-  { key: "driver_balance", label: "Баланс" },
+  { key: "trip_fines", label: "Штрафы за рейсы" },
   { key: "profit", label: "Прибыль" },
   { key: "profitability", label: "Рентаб." },
   { key: "price_per_trip", label: "Цена рейса" },
@@ -119,8 +119,8 @@ function sortValue(r: FlatRow, key: SortKey): string | number {
       return r.driver_pct;
     case "driver_payout":
       return r.driver_payout;
-    case "driver_balance":
-      return 0; // будет заменено при сортировке через driverBalances map
+    case "trip_fines":
+      return r.fines;
     case "profit":
       return r.profit;
     case "profitability":
@@ -358,9 +358,6 @@ export default function Reports() {
   // «Вид» (2026-06-29) — по умолчанию «Полный», как и раньше.
   const [view, setView] = useState<ReportView>("full");
 
-  // Текущий баланс по каждому водителю (2026-07-13): загружается один раз,
-  // не зависит от выбранного периода — это накопительный итог на сегодня.
-  const [driverBalances, setDriverBalances] = useState<Record<number, number>>({});
 
   // По умолчанию — последние 5 недель (задача #137, 2026-06-28)
   const [{ dateFrom: initFrom, dateTo: initTo }] = useState(() => lastNWeeksRange(5));
@@ -388,17 +385,6 @@ export default function Reports() {
     };
   }, [dateFrom, dateTo, tab]);
 
-  // Загружаем балансы водителей один раз при монтировании (не зависят от периода)
-  useEffect(() => {
-    api
-      .get<{ driver_id: number; balance: number }[]>("/api/driver-transactions/balances")
-      .then((data) => {
-        const map: Record<number, number> = {};
-        data.forEach((r) => { map[r.driver_id] = r.balance; });
-        setDriverBalances(map);
-      })
-      .catch(() => { /* показываем "—" если не удалось загрузить */ });
-  }, []);
 
   const flatRows: FlatRow[] = useMemo(
     () =>
@@ -434,10 +420,7 @@ export default function Reports() {
     rows.sort((a, b) => {
       let va: string | number;
       let vb: string | number;
-      if (sortKey === "driver_balance") {
-        va = a.driver_id ? (driverBalances[a.driver_id] ?? 0) : 0;
-        vb = b.driver_id ? (driverBalances[b.driver_id] ?? 0) : 0;
-      } else {
+      {
         va = sortValue(a, sortKey);
         vb = sortValue(b, sortKey);
       }
@@ -446,7 +429,7 @@ export default function Reports() {
       return sortDir === "asc" ? cmp : -cmp;
     });
     return rows;
-  }, [filteredRows, sortKey, sortDir, driverBalances]);
+  }, [filteredRows, sortKey, sortDir]);
 
   const totals = useMemo(
     () =>
@@ -635,21 +618,8 @@ export default function Reports() {
                             <td>{money(r.fuel)}</td>
                             <td>{r.driver_pct.toFixed(0)}%</td>
                             <td>{money(r.driver_payout)}</td>
-                            <td style={(() => {
-                              const b = r.driver_id ? (driverBalances[r.driver_id] ?? null) : null;
-                              return {
-                                textAlign: "right" as const,
-                                fontWeight: 600,
-                                color: b === null ? undefined : b < 0 ? "var(--ember)" : b === 0 ? "var(--ink-3)" : undefined,
-                              };
-                            })()}
-                              title={r.driver_id && driverBalances[r.driver_id] !== undefined
-                                ? `Баланс водителя на сегодня: ${money(driverBalances[r.driver_id])}`
-                                : undefined}
-                            >
-                              {r.driver_id && driverBalances[r.driver_id] !== undefined
-                                ? money(driverBalances[r.driver_id])
-                                : "—"}
+                            <td style={{ color: r.fines ? "var(--bad-ink)" : undefined }}>
+                              {money(r.fines)}
                             </td>
                             {view === "full" && (
                               <td style={{ color: r.profit >= 0 ? "var(--good-ink)" : "var(--bad-ink)", fontWeight: 700 }}>
@@ -676,7 +646,7 @@ export default function Reports() {
                           <td>{money(totals.fuel)}</td>
                           <td>—</td>
                           <td>{money(totals.driver_payout)}</td>
-                          <td style={{ textAlign: "right", color: "var(--ink-3)" }}>—</td>
+                          <td style={{ color: totals.fines ? "var(--bad-ink)" : undefined }}>{money(totals.fines)}</td>
                           {view === "full" && (
                             <td style={{ color: totals.profit >= 0 ? "var(--good-ink)" : "var(--bad-ink)" }}>
                               {money(totals.profit)}
