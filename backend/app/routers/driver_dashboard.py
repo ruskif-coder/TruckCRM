@@ -118,11 +118,14 @@ def driver_summary(
     # SQLite LOWER() не поддерживает кириллицу:
     #   LOWER('Отменено') = 'Отменено'  (не 'отменено')
     # Python str.lower() работает корректно для любого Unicode.
+    # dep_at — datetime; сравнение с date-объектом в SQLite дёт строки,
+    # поэтому используем < следующего понедельника чтобы включить весь воскресный день.
+    next_monday = billing_monday + timedelta(weeks=1)
     week_trips = session.exec(
         select(models.Trip).where(
             models.Trip.driver_id == user.driver_id,
             models.Trip.dep_at >= billing_monday,  # type: ignore[arg-type]
-            models.Trip.dep_at <= billing_sunday,  # type: ignore[arg-type]
+            models.Trip.dep_at < next_monday,       # type: ignore[arg-type]
         )
     ).all()
 
