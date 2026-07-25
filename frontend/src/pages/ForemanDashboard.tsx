@@ -946,6 +946,11 @@ export default function ForemanDashboard() {
                       <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
                         <div style={{ textAlign: "right" }}>
                           <div style={{ fontSize: 14, fontWeight: 700, color: C.ink }}>{money(t.amount)}</div>
+                          {t.fines > 0 && (
+                            <div style={{ fontSize: 11, fontWeight: 600, color: C.danger, marginTop: 1 }}>
+                              штраф −{money(t.fines)}
+                            </div>
+                          )}
                           <div style={{ fontSize: 11, color: C.ink2, marginTop: 2 }}>{t.status}</div>
                         </div>
                         <div style={{

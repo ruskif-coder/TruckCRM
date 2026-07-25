@@ -128,6 +128,7 @@ export default function DriverTrips() {
   useEffect(() => { load(dateFrom, dateTo); }, []);
 
   const totalPayout = rows.reduce((s, r) => s + r.driver_payout, 0);
+  const totalFines  = rows.reduce((s, r) => s + (r.fines ?? 0), 0);
   const cnt = rows.length;
   const cntLabel = cnt === 1 ? "рейс" : cnt < 5 ? "рейса" : "рейсов";
 
@@ -219,7 +220,16 @@ export default function DriverTrips() {
           display: "flex", justifyContent: "space-between", alignItems: "center",
         }}>
           <span style={{ fontSize: 13, color: C.ink2 }}>{cnt} {cntLabel}</span>
-          <span style={{ fontSize: 13, fontWeight: 700 }}>Итого: {money(totalPayout)}</span>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+            {filterParam !== "cancelled" && (
+              <span style={{ fontSize: 13, fontWeight: 700 }}>Итого: {money(totalPayout)}</span>
+            )}
+            {totalFines > 0 && (
+              <span style={{ fontSize: 13, fontWeight: 700, color: "#e74c3c" }}>
+                Штрафы: −{money(totalFines)}
+              </span>
+            )}
+          </div>
         </div>
       )}
 
