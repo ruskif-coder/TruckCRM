@@ -448,6 +448,7 @@ def driver_trips(
             "end_at": t.end_at,
             "rate_type": rate_type,
             "driver_payout": payout,
+            "fines": float(t.fines or 0),
         })
 
     return result

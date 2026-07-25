@@ -16,6 +16,7 @@ type TripRow = {
   end_at: string | null;
   rate_type: string;
   driver_payout: number;
+  fines: number;
 };
 
 // ---------- Стиль (те же константы, что в DriverDashboard) ----------
@@ -97,17 +98,26 @@ export default function DriverTrips() {
   const defaultFrom = searchParams.get("from")
     ?? isoDate(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
   const defaultTo = searchParams.get("to") ?? isoDate(new Date());
+  // filter=completed → только выполненные; filter=cancelled → только отменённые
+  const filterParam = searchParams.get("filter") ?? "all";
 
   const [dateFrom, setDateFrom] = useState(defaultFrom);
   const [dateTo, setDateTo]     = useState(defaultTo);
-  const [rows, setRows]         = useState<TripRow[]>([]);
+  const [allRows, setAllRows]   = useState<TripRow[]>([]);
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState<string | null>(null);
+
+  const rows = allRows.filter(r => {
+    const isCancelled = (r.status || "").toLowerCase().startsWith("отмен");
+    if (filterParam === "completed") return !isCancelled;
+    if (filterParam === "cancelled") return isCancelled;
+    return true;
+  });
 
   async function load(from: string, to: string) {
     setLoading(true); setError(null);
     try {
-      setRows(await api.get<TripRow[]>(
+      setAllRows(await api.get<TripRow[]>(
         `/api/driver-dashboard/trips?date_from=${from}&date_to=${to}`
       ));
     } catch (err) {
@@ -153,7 +163,9 @@ export default function DriverTrips() {
         >
           ←
         </button>
-        <h1 style={{ margin: 0, fontSize: 18, fontWeight: 700, flex: 1 }}>Мои рейсы</h1>
+        <h1 style={{ margin: 0, fontSize: 18, fontWeight: 700, flex: 1 }}>
+          {filterParam === "cancelled" ? "Отменённые рейсы" : filterParam === "completed" ? "Выполненные рейсы" : "Мои рейсы"}
+        </h1>
       </div>
 
       {/* ══════════ ФИЛЬТР ДАТ ══════════ */}
@@ -280,11 +292,18 @@ export default function DriverTrips() {
                 )}
               </div>
 
-              <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                <RateBadge rateType={row.rate_type} />
-                <span style={{ fontWeight: 700, fontSize: 16, color: C.ink }}>
-                  {money(row.driver_payout)}
-                </span>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <RateBadge rateType={row.rate_type} />
+                  <span style={{ fontWeight: 700, fontSize: 16, color: C.ink }}>
+                    {money(row.driver_payout)}
+                  </span>
+                </div>
+                {(row.fines ?? 0) > 0 && (
+                  <span style={{ fontSize: 13, fontWeight: 600, color: "#e74c3c" }}>
+                    штраф −{money(row.fines)}
+                  </span>
+                )}
               </div>
             </div>
           </div>

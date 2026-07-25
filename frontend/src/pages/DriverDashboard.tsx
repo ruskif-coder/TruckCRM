@@ -675,17 +675,18 @@ export default function DriverDashboard() {
           {/* ── Карточки рейсов ── */}
           <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
             {/* Рейсов за неделю (без отмены) */}
+            {/* Выполненные рейсы */}
             <button
               onClick={() => {
                 const from = summary?.last_week_start ?? null;
                 const to = lastWeekEnd;
-                navigate(`/driver/trips${from && to ? `?from=${from}&to=${to}` : ""}`);
+                navigate(`/driver/trips${from && to ? `?from=${from}&to=${to}&filter=completed` : "?filter=completed"}`);
               }}
               style={{
                 background: C.card,
                 borderRadius: C.radius,
                 boxShadow: C.cardShadow,
-                padding: "18px 16px",
+                padding: "14px 16px",
                 width: "100%",
                 border: "none",
                 cursor: "pointer",
@@ -714,12 +715,11 @@ export default function DriverDashboard() {
                 />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 11, color: C.ink2, marginBottom: 2 }}>Рейсов за период с выплатой</div>
-                <div style={{ fontSize: 28, fontWeight: 700, color: C.ink, lineHeight: 1 }}>
-                  {summary?.last_week_trips ?? 0}
-                </div>
-                <div style={{ fontSize: 11, color: C.ink2, marginTop: 3 }}>
+                <div style={{ fontSize: 11, color: C.ink2, marginBottom: 2 }}>
                   {weekLabel(summary?.last_week_start ?? null, lastWeekEnd)}
+                </div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: C.ink, lineHeight: 1.3 }}>
+                  Рейсов за период: {summary?.last_week_trips ?? 0}
                 </div>
               </div>
               <div style={{ color: C.ink2, fontSize: 18 }}>›</div>
@@ -727,25 +727,37 @@ export default function DriverDashboard() {
 
             {/* Отменённые рейсы — показываем только если есть */}
             {(summary?.last_week_cancelled ?? 0) > 0 && (
-              <div style={{
-                background: C.card,
-                borderRadius: C.radius,
-                boxShadow: C.cardShadow,
-                padding: "14px 16px",
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-              }}>
+              <button
+                onClick={() => {
+                  const from = summary?.last_week_start ?? null;
+                  const to = lastWeekEnd;
+                  navigate(`/driver/trips${from && to ? `?from=${from}&to=${to}&filter=cancelled` : "?filter=cancelled"}`);
+                }}
+                style={{
+                  background: C.card,
+                  borderRadius: C.radius,
+                  boxShadow: C.cardShadow,
+                  padding: "14px 16px",
+                  width: "100%",
+                  border: "none",
+                  cursor: "pointer",
+                  textAlign: "left",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  fontFamily: "inherit",
+                }}
+              >
                 <div style={{
-                  width: 36, height: 36, borderRadius: 10,
+                  width: 44, height: 44, borderRadius: 12,
                   background: "#e74c3c18",
                   display: "grid", placeItems: "center",
                   flexShrink: 0,
                 }}>
-                  <span style={{ fontSize: 18, lineHeight: 1, color: "#e74c3c" }}>✕</span>
+                  <span style={{ fontSize: 22, lineHeight: 1, color: "#e74c3c" }}>✕</span>
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 11, color: C.ink2 }}>
+                  <div style={{ fontSize: 11, color: C.ink2, marginBottom: 2 }}>
                     {weekLabel(summary?.last_week_start ?? null, lastWeekEnd)}
                   </div>
                   <div style={{ fontSize: 15, fontWeight: 600, color: "#e74c3c", lineHeight: 1.3 }}>
@@ -757,7 +769,7 @@ export default function DriverDashboard() {
                     −{money(summary!.last_week_cancelled_fines)}
                   </div>
                 )}
-              </div>
+              </button>
             )}
           </div>
 
