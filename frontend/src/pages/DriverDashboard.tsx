@@ -677,7 +677,7 @@ export default function DriverDashboard() {
                 <span style={{ fontFamily: "'icon-works', sans-serif", fontSize: 26, color: "#fff", lineHeight: 1, userSelect: "none" }}
                   dangerouslySetInnerHTML={{ __html: "&#66;" }} />
               </div>
-              <div style={{ fontSize: 36, fontWeight: 800, color: C.ink, lineHeight: 1, flexShrink: 0, minWidth: 36 }}>
+              <div style={{ fontSize: 36, color: C.ink, lineHeight: 1, flexShrink: 0, minWidth: 36 }}>
                 {summary?.last_week_trips ?? 0}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -686,7 +686,7 @@ export default function DriverDashboard() {
               </div>
               <div style={{ textAlign: "right", flexShrink: 0 }}>
                 <div style={{ fontSize: 11, color: C.ink2, marginBottom: 4 }}>заработано</div>
-                <div style={{ fontSize: 22, fontWeight: 800, color: C.good, lineHeight: 1 }}>
+                <div style={{ fontSize: 22, fontWeight: 700, color: C.good, lineHeight: 1 }}>
                   {(summary?.last_week_payout ?? 0) > 0 ? money(summary!.last_week_payout) : "—"}
                 </div>
               </div>
@@ -709,7 +709,7 @@ export default function DriverDashboard() {
                 <div style={{ width: 52, height: 52, borderRadius: 14, background: "#e74c3c18", display: "grid", placeItems: "center", flexShrink: 0 }}>
                   <span style={{ fontSize: 26, lineHeight: 1, color: "#e74c3c" }}>✕</span>
                 </div>
-                <div style={{ fontSize: 36, fontWeight: 800, color: "#e74c3c", lineHeight: 1, flexShrink: 0, minWidth: 36 }}>
+                <div style={{ fontSize: 36, color: "#e74c3c", lineHeight: 1, flexShrink: 0, minWidth: 36 }}>
                   {summary?.last_week_cancelled}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -718,7 +718,7 @@ export default function DriverDashboard() {
                 </div>
                 <div style={{ textAlign: "right", flexShrink: 0 }}>
                   <div style={{ fontSize: 11, color: C.ink2, marginBottom: 4 }}>штрафы</div>
-                  <div style={{ fontSize: 22, fontWeight: 800, color: "#e74c3c", lineHeight: 1 }}>
+                  <div style={{ fontSize: 22, fontWeight: 700, color: "#e74c3c", lineHeight: 1 }}>
                     {(summary?.last_week_cancelled_fines ?? 0) > 0 ? `−${money(summary!.last_week_cancelled_fines)}` : "—"}
                   </div>
                 </div>
