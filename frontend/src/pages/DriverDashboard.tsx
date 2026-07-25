@@ -669,28 +669,23 @@ export default function DriverDashboard() {
               }}
               style={{
                 background: C.card, borderRadius: C.radius, boxShadow: C.cardShadow,
-                padding: "14px 16px", width: "100%", border: "none", cursor: "pointer",
+                padding: "16px", width: "100%", border: "none", cursor: "pointer",
                 textAlign: "left", display: "flex", alignItems: "center", gap: 12, fontFamily: "inherit",
               }}
             >
-              <div style={{ width: 44, height: 44, borderRadius: 12, background: C.dark, display: "grid", placeItems: "center", flexShrink: 0 }}>
-                <span style={{ fontFamily: "'icon-works', sans-serif", fontSize: 22, color: "#fff", lineHeight: 1, userSelect: "none" }}
-                  dangerouslySetInnerHTML={{ __html: "&#66;" }} />
+              <div style={{ width: 52, height: 52, borderRadius: 14, background: C.dark, flexShrink: 0 }} />
+              <div style={{ fontSize: 36, fontWeight: 800, color: C.ink, lineHeight: 1, flexShrink: 0, minWidth: 36 }}>
+                {summary?.last_week_trips ?? 0}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 11, color: C.ink2, marginBottom: 3 }}>
-                  {weekLabel(summary?.last_week_start ?? null, lastWeekEnd)}
-                </div>
-                <div style={{ fontSize: 12, color: C.ink2 }}>Рейсов за период</div>
-                <div style={{ fontSize: 22, fontWeight: 700, color: C.ink, lineHeight: 1.2 }}>
-                  {summary?.last_week_trips ?? 0}
-                </div>
+                <div style={{ fontSize: 11, color: C.ink2 }}>{weekLabel(summary?.last_week_start ?? null, lastWeekEnd)}</div>
+                <div style={{ fontSize: 13, color: C.ink2, marginTop: 2 }}>Рейсов<br />за период</div>
               </div>
               <div style={{ textAlign: "right", flexShrink: 0 }}>
-                <div style={{ fontSize: 15, fontWeight: 700, color: C.good }}>
+                <div style={{ fontSize: 11, color: C.ink2, marginBottom: 4 }}>заработано</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: C.good, lineHeight: 1 }}>
                   {(summary?.last_week_payout ?? 0) > 0 ? money(summary!.last_week_payout) : "—"}
                 </div>
-                <div style={{ fontSize: 18, color: C.ink2, marginTop: 6 }}>›</div>
               </div>
             </button>
 
@@ -704,27 +699,23 @@ export default function DriverDashboard() {
                 }}
                 style={{
                   background: C.card, borderRadius: C.radius, boxShadow: C.cardShadow,
-                  padding: "14px 16px", width: "100%", border: "none", cursor: "pointer",
+                  padding: "16px", width: "100%", border: "none", cursor: "pointer",
                   textAlign: "left", display: "flex", alignItems: "center", gap: 12, fontFamily: "inherit",
                 }}
               >
-                <div style={{ width: 44, height: 44, borderRadius: 12, background: "#e74c3c18", display: "grid", placeItems: "center", flexShrink: 0 }}>
-                  <span style={{ fontSize: 22, lineHeight: 1, color: "#e74c3c" }}>✕</span>
+                <div style={{ width: 52, height: 52, borderRadius: 14, background: "#e74c3c18", flexShrink: 0 }} />
+                <div style={{ fontSize: 36, fontWeight: 800, color: "#e74c3c", lineHeight: 1, flexShrink: 0, minWidth: 36 }}>
+                  {summary?.last_week_cancelled}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 11, color: C.ink2, marginBottom: 3 }}>
-                    {weekLabel(summary?.last_week_start ?? null, lastWeekEnd)}
-                  </div>
-                  <div style={{ fontSize: 12, color: C.ink2 }}>Отменено рейсов</div>
-                  <div style={{ fontSize: 22, fontWeight: 700, color: "#e74c3c", lineHeight: 1.2 }}>
-                    {summary?.last_week_cancelled}
-                  </div>
+                  <div style={{ fontSize: 11, color: C.ink2 }}>{weekLabel(summary?.last_week_start ?? null, lastWeekEnd)}</div>
+                  <div style={{ fontSize: 13, color: C.ink2, marginTop: 2 }}>Отменено<br />рейсов</div>
                 </div>
                 <div style={{ textAlign: "right", flexShrink: 0 }}>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: "#e74c3c" }}>
+                  <div style={{ fontSize: 11, color: C.ink2, marginBottom: 4 }}>штрафы</div>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: "#e74c3c", lineHeight: 1 }}>
                     {(summary?.last_week_cancelled_fines ?? 0) > 0 ? `−${money(summary!.last_week_cancelled_fines)}` : "—"}
                   </div>
-                  <div style={{ fontSize: 18, color: C.ink2, marginTop: 6 }}>›</div>
                 </div>
               </button>
             )}
