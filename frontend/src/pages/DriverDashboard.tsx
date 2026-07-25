@@ -23,18 +23,10 @@ type Summary = {
   balance: number;
   as_of: string | null;
   last_week_trips: number;
+  last_week_payout: number;
   last_week_cancelled: number;
   last_week_cancelled_fines: number;
   last_week_start: string | null;
-};
-type WeeklyRow = {
-  week_start: string;
-  week_end: string;
-  trips: number;
-  driver_payout: number;
-  driver_paid: number;
-  unpaid: number;
-  fines: number;
 };
 type DriverTx = {
   id: number;
@@ -194,11 +186,9 @@ export default function DriverDashboard() {
   const [cpSaving, setCpSaving] = useState(false);
   const [cpOk, setCpOk] = useState(false);
   const [cpError, setCpError] = useState<string | null>(null);
-  const [weeklyRows, setWeeklyRows] = useState<WeeklyRow[]>([]);
   const [weeklyLoading, setWeeklyLoading] = useState(false);
   const [txData, setTxData] = useState<TxData | null>(null);
   const [fullLedger, setFullLedger] = useState<LedgerEntry[]>([]);
-  const [balanceTab, setBalanceTab] = useState<"weeks" | "ledger">("weeks");
 
   // Формы
   const [mTruckId, setMTruckId] = useState("");
@@ -348,18 +338,13 @@ export default function DriverDashboard() {
 
   async function openWeekly() {
     setModal("weekly");
-    setBalanceTab("ledger");  // дефолт — полная выписка (штрафы/авансы/начисления видны сразу)
     setWeeklyLoading(true);
-    // Каждый запрос независим: ошибка в одном не гасит остальные
-    const [rows, txs, ledger] = await Promise.all([
-      api.get<WeeklyRow[]>("/api/driver-dashboard/weekly")
-        .catch(() => [] as WeeklyRow[]),
+    const [txs, ledger] = await Promise.all([
       api.get<TxData>("/api/driver-transactions/")
         .catch(() => ({ balance_adjustment: 0, transactions: [] } as TxData)),
       api.get<LedgerEntry[]>("/api/driver-transactions/full-ledger")
         .catch(() => [] as LedgerEntry[]),
     ]);
-    setWeeklyRows(rows);
     setTxData(txs);
     setFullLedger(ledger);
     setWeeklyLoading(false);
@@ -721,6 +706,11 @@ export default function DriverDashboard() {
                 <div style={{ fontSize: 15, fontWeight: 600, color: C.ink, lineHeight: 1.3 }}>
                   Рейсов за период: {summary?.last_week_trips ?? 0}
                 </div>
+                {(summary?.last_week_payout ?? 0) > 0 && (
+                  <div style={{ fontSize: 13, fontWeight: 700, color: C.good, marginTop: 2 }}>
+                    {money(summary!.last_week_payout)}
+                  </div>
+                )}
               </div>
               <div style={{ color: C.ink2, fontSize: 18 }}>›</div>
             </button>
@@ -1007,109 +997,50 @@ export default function DriverDashboard() {
                     </span>
                   </div>
 
-                  {/* Вкладки */}
-                  <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
-                    {(["weeks", "ledger"] as const).map(tab => (
-                      <button key={tab} type="button" onClick={() => setBalanceTab(tab)} style={{
-                        flex: 1, border: "none", borderRadius: 10, padding: "9px 0",
-                        fontSize: 13, fontWeight: 600, fontFamily: "inherit", cursor: "pointer",
-                        background: balanceTab === tab ? C.iris : C.irisLight,
-                        color: balanceTab === tab ? "#fff" : C.iris,
-                        transition: "background .15s, color .15s",
-                      }}>
-                        {tab === "weeks" ? "По неделям" : "Все операции"}
-                      </button>
-                    ))}
-                  </div>
-
                   {weeklyLoading ? (
                     <div style={{ textAlign: "center", padding: "32px 0", color: C.ink2 }}>Загрузка...</div>
-                  ) : balanceTab === "weeks" ? (
-                    weeklyRows.length === 0 ? (
-                      <div style={{ textAlign: "center", padding: "32px 0", color: C.ink2 }}>Нет данных</div>
-                    ) : (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                        {weeklyRows.map((row) => {
-                          const closed = row.driver_payout > 0 && row.unpaid === 0;
-                          const hasDebt = row.unpaid > 0;
-                          const accent = closed ? "#27ae60" : hasDebt ? "var(--ember,#e74c3c)" : C.border;
-                          return (
-                            <div key={row.week_start} style={{
-                              background: C.bg, borderRadius: 14,
-                              padding: "14px 16px", borderLeft: `3px solid ${accent}`,
-                            }}>
-                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                  <span style={{ fontWeight: 600, fontSize: 14 }}>
-                                    {weekLabel(row.week_start, row.week_end)}
-                                  </span>
-                                  {closed && (
-                                    <span style={{
-                                      background: "#27ae60", color: "#fff",
-                                      fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 5,
-                                    }}>ОПЛАЧЕНО</span>
-                                  )}
-                                </div>
-                                <span style={{ fontSize: 12, color: C.ink2 }}>
-                                  {row.trips} рейс{row.trips === 1 ? "" : row.trips < 5 ? "а" : "ов"}
-                                </span>
-                              </div>
-                              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 4 }}>
-                                <AmountCell label="Начислено" value={row.driver_payout} />
-                                <AmountCell label="Выплачено" value={row.driver_paid} />
-                                <AmountCell label="Остаток"   value={row.unpaid} highlight={hasDebt} />
-                                <AmountCell label="Штрафы"    value={row.fines} highlight={row.fines > 0} color="var(--ember,#e74c3c)" />
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )
+                  ) : fullLedger.length === 0 ? (
+                    <div style={{ textAlign: "center", padding: "32px 0", color: C.ink2 }}>
+                      Операций пока нет
+                    </div>
                   ) : (
-                    /* Вкладка «Все операции» — полная выписка из /full-ledger */
-                    fullLedger.length === 0 ? (
-                      <div style={{ textAlign: "center", padding: "32px 0", color: C.ink2 }}>
-                        Операций пока нет
-                      </div>
-                    ) : (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                        {fullLedger.map((entry, i) => {
-                          const isCredit = entry.amount > 0;
-                          const isPnl = entry.entry_type === "pnl_accrual" || entry.entry_type === "pnl_payment";
-                          return (
-                            <div key={i} style={{
-                              background: isPnl ? C.irisLight : C.bg,
-                              borderRadius: 12, padding: "12px 14px",
-                              display: "flex", alignItems: "flex-start", gap: 12,
-                              borderLeft: `3px solid ${isCredit ? "#27ae60" : "var(--ember,#e74c3c)"}`,
-                            }}>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontWeight: 600, fontSize: 13, color: C.ink }}>
-                                  {TX_LABELS[entry.entry_type] ?? entry.entry_type}
-                                </div>
-                                {entry.description && (
-                                  <div style={{
-                                    fontSize: 11, color: C.ink2, marginTop: 2,
-                                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                                  }}>
-                                    {entry.description}
-                                  </div>
-                                )}
-                                <div style={{ fontSize: 11, color: C.ink2, marginTop: 2 }}>
-                                  {fmtDate(entry.date)}
-                                </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {fullLedger.map((entry, i) => {
+                        const isCredit = entry.amount > 0;
+                        const isPnl = entry.entry_type === "pnl_accrual" || entry.entry_type === "pnl_payment";
+                        return (
+                          <div key={i} style={{
+                            background: isPnl ? C.irisLight : C.bg,
+                            borderRadius: 12, padding: "12px 14px",
+                            display: "flex", alignItems: "flex-start", gap: 12,
+                            borderLeft: `3px solid ${isCredit ? "#27ae60" : "var(--ember,#e74c3c)"}`,
+                          }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontWeight: 600, fontSize: 13, color: C.ink }}>
+                                {TX_LABELS[entry.entry_type] ?? entry.entry_type}
                               </div>
-                              <span style={{
-                                fontWeight: 700, fontSize: 14, whiteSpace: "nowrap",
-                                color: isCredit ? "#27ae60" : "var(--ember,#e74c3c)",
-                              }}>
-                                {isCredit ? "+" : ""}{money(entry.amount)}
-                              </span>
+                              {entry.description && (
+                                <div style={{
+                                  fontSize: 11, color: C.ink2, marginTop: 2,
+                                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                                }}>
+                                  {entry.description}
+                                </div>
+                              )}
+                              <div style={{ fontSize: 11, color: C.ink2, marginTop: 2 }}>
+                                {fmtDate(entry.date)}
+                              </div>
                             </div>
-                          );
-                        })}
-                      </div>
-                    )
+                            <span style={{
+                              fontWeight: 700, fontSize: 14, whiteSpace: "nowrap",
+                              color: isCredit ? "#27ae60" : "var(--ember,#e74c3c)",
+                            }}>
+                              {isCredit ? "+" : ""}{money(entry.amount)}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
                   )}
 
                   <MBtn onClick={() => setModal(null)} style={{ marginTop: 16 }}>Закрыть</MBtn>

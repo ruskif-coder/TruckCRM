@@ -143,12 +143,21 @@ def driver_summary(
         if (t.status or "").lower().startswith("отмен")
     )
 
+    # Выплата за выполненные рейсы недели — берём из weekly_pnl строк,
+    # у которых week_start совпадает с billing_monday.
+    last_week_payout = sum(
+        r["driver_payout"]
+        for r in driver_rows
+        if r.get("week_start") == billing_monday
+    )
+
     return {
         "driver_id": user.driver_id,
         "driver_name": user.full_name or user.username,
         "balance": balance,
         "as_of": as_of,
         "last_week_trips": last_week_trips,
+        "last_week_payout": round(last_week_payout, 2),
         "last_week_cancelled": last_week_cancelled,
         "last_week_cancelled_fines": round(last_week_cancelled_fines, 2),
         "last_week_start": billing_monday,
