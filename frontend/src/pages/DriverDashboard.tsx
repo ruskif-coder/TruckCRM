@@ -673,7 +673,10 @@ export default function DriverDashboard() {
                 textAlign: "left", display: "flex", alignItems: "center", gap: 12, fontFamily: "inherit",
               }}
             >
-              <div style={{ width: 52, height: 52, borderRadius: 14, background: C.dark, flexShrink: 0 }} />
+              <div style={{ width: 52, height: 52, borderRadius: 14, background: C.dark, display: "grid", placeItems: "center", flexShrink: 0 }}>
+                <span style={{ fontFamily: "'icon-works', sans-serif", fontSize: 26, color: "#fff", lineHeight: 1, userSelect: "none" }}
+                  dangerouslySetInnerHTML={{ __html: "&#66;" }} />
+              </div>
               <div style={{ fontSize: 36, fontWeight: 800, color: C.ink, lineHeight: 1, flexShrink: 0, minWidth: 36 }}>
                 {summary?.last_week_trips ?? 0}
               </div>
@@ -703,7 +706,9 @@ export default function DriverDashboard() {
                   textAlign: "left", display: "flex", alignItems: "center", gap: 12, fontFamily: "inherit",
                 }}
               >
-                <div style={{ width: 52, height: 52, borderRadius: 14, background: "#e74c3c18", flexShrink: 0 }} />
+                <div style={{ width: 52, height: 52, borderRadius: 14, background: "#e74c3c18", display: "grid", placeItems: "center", flexShrink: 0 }}>
+                  <span style={{ fontSize: 26, lineHeight: 1, color: "#e74c3c" }}>✕</span>
+                </div>
                 <div style={{ fontSize: 36, fontWeight: 800, color: "#e74c3c", lineHeight: 1, flexShrink: 0, minWidth: 36 }}>
                   {summary?.last_week_cancelled}
                 </div>
