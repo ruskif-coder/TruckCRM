@@ -24,6 +24,7 @@ type Summary = {
   as_of: string | null;
   last_week_trips: number;
   last_week_cancelled: number;
+  last_week_cancelled_fines: number;
   last_week_start: string | null;
 };
 type WeeklyRow = {
@@ -570,49 +571,60 @@ export default function DriverDashboard() {
 
           {/* ── Баннер активной машины ── */}
           {activeSession && (
-            <div
-              onClick={async () => {
-                if (truckInfo) { setModal("truckinfo" as typeof modal); return; }
-                setTruckInfoLoading(true);
-                try {
-                  const info = await api.get<TruckInfo>(`/api/driver-dashboard/truck/${activeSession.truck_id}`);
-                  setTruckInfo(info);
-                  setModal("truckinfo" as typeof modal);
-                } catch { /* игнорируем */ } finally { setTruckInfoLoading(false); }
-              }}
-              style={{
-                background: `linear-gradient(135deg, ${C.good}18, ${C.good}08)`,
-                border: `1.5px solid ${C.good}40`,
-                borderRadius: C.radius,
-                padding: "14px 16px",
-                marginBottom: 12,
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                cursor: "pointer",
-              }}
-            >
-              <div style={{
-                width: 36, height: 36, borderRadius: 10,
-                background: C.good,
-                display: "grid", placeItems: "center",
-                flexShrink: 0,
-                fontSize: 18,
-              }}>
-                {truckInfoLoading ? "⏳" : "🚛"}
+            <div style={{
+              background: `linear-gradient(135deg, ${C.good}18, ${C.good}08)`,
+              border: `1.5px solid ${C.good}40`,
+              borderRadius: C.radius,
+              padding: "14px 16px",
+              marginBottom: 12,
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+            }}>
+              <div
+                onClick={async () => {
+                  if (truckInfo) { setModal("truckinfo" as typeof modal); return; }
+                  setTruckInfoLoading(true);
+                  try {
+                    const info = await api.get<TruckInfo>(`/api/driver-dashboard/truck/${activeSession.truck_id}`);
+                    setTruckInfo(info);
+                    setModal("truckinfo" as typeof modal);
+                  } catch { /* игнорируем */ } finally { setTruckInfoLoading(false); }
+                }}
+                style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0, cursor: "pointer" }}
+              >
+                <div style={{
+                  width: 36, height: 36, borderRadius: 10,
+                  background: C.good,
+                  display: "grid", placeItems: "center",
+                  flexShrink: 0, fontSize: 18,
+                }}>
+                  {truckInfoLoading ? "⏳" : "🚛"}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 11, color: C.good, fontWeight: 700, letterSpacing: 0.4, textTransform: "uppercase" }}>
+                    Принята · нажмите для сводки
+                  </div>
+                  <div style={{ fontWeight: 700, fontSize: 15, color: C.ink }}>
+                    {activeSession.truck_plate || activeSession.truck_label}
+                  </div>
+                  <div style={{ fontSize: 12, color: C.ink2 }}>
+                    с {new Date(activeSession.started_at).toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}
+                  </div>
+                </div>
               </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 11, color: C.good, fontWeight: 700, letterSpacing: 0.4, textTransform: "uppercase" }}>
-                  Принята · нажмите для сводки
-                </div>
-                <div style={{ fontWeight: 700, fontSize: 15, color: C.ink }}>
-                  {activeSession.truck_plate || activeSession.truck_label}
-                </div>
-                <div style={{ fontSize: 12, color: C.ink2 }}>
-                  с {new Date(activeSession.started_at).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}
-                </div>
-              </div>
-              <div style={{ fontSize: 18, color: C.ink2 }}>›</div>
+              {/* Кнопка Сдать машину — справа от виджета */}
+              <button
+                onClick={() => openModal("handover")}
+                style={{
+                  background: C.good, border: "none", color: "#fff",
+                  borderRadius: 10, padding: "8px 14px", fontSize: 13,
+                  fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+                  flexShrink: 0, whiteSpace: "nowrap",
+                }}
+              >
+                Сдать
+              </button>
             </div>
           )}
 
@@ -702,7 +714,7 @@ export default function DriverDashboard() {
                 />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 11, color: C.ink2, marginBottom: 2 }}>Рейсов за неделю</div>
+                <div style={{ fontSize: 11, color: C.ink2, marginBottom: 2 }}>Рейсов за период с выплатой</div>
                 <div style={{ fontSize: 28, fontWeight: 700, color: C.ink, lineHeight: 1 }}>
                   {summary?.last_week_trips ?? 0}
                 </div>
@@ -737,7 +749,12 @@ export default function DriverDashboard() {
                   <div style={{ fontSize: 28, fontWeight: 700, color: "#e74c3c", lineHeight: 1 }}>
                     {summary?.last_week_cancelled}
                   </div>
-                  <div style={{ fontSize: 11, color: C.ink2, marginTop: 3 }}>
+                  {(summary?.last_week_cancelled_fines ?? 0) > 0 && (
+                    <div style={{ fontSize: 11, color: "#e74c3c", marginTop: 2, fontWeight: 600 }}>
+                      штраф {money(summary!.last_week_cancelled_fines)}
+                    </div>
+                  )}
+                  <div style={{ fontSize: 11, color: C.ink2, marginTop: 2 }}>
                     {weekLabel(summary?.last_week_start ?? null, lastWeekEnd)}
                   </div>
                 </div>
@@ -745,18 +762,23 @@ export default function DriverDashboard() {
             )}
           </div>
 
-          {/* ── Кнопки действий 2×2 ── */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          {/* ── Кнопки действий 3 в строку ── */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
             <ActionCard icon="&#228;" label="Пробег +"        onClick={() => openModal("mileage")} />
             <ActionCard icon="&#91;"  label="Расход +"         onClick={() => openModal("expense")} />
-            <ActionCard icon="&#245;" label="Заявка на ремонт" onClick={() => openModal("repair")} />
-            <ActionCard
-              icon="&#47;"
-              label={activeSession ? "Сдать машину" : "Принять машину"}
-              accent={!!activeSession}
-              onClick={() => openModal("handover")}
-            />
+            <ActionCard icon="&#245;" label="Ремонт"           onClick={() => openModal("repair")} />
           </div>
+          {/* Кнопка приёмки — отдельно, только если нет активной сессии */}
+          {!activeSession && (
+            <div style={{ marginTop: 10 }}>
+              <ActionCard
+                icon="&#47;"
+                label="Принять машину"
+                accent={false}
+                onClick={() => openModal("handover")}
+              />
+            </div>
+          )}
 
           {/* ── Мои заявки на компенсацию ── */}
           {myComps.length > 0 && (

@@ -134,6 +134,11 @@ def driver_summary(
         1 for t in week_trips
         if (t.status or "").lower().startswith("отмен")
     )
+    last_week_cancelled_fines = sum(
+        float(t.fines or 0)
+        for t in week_trips
+        if (t.status or "").lower().startswith("отмен")
+    )
 
     return {
         "driver_id": user.driver_id,
@@ -142,6 +147,7 @@ def driver_summary(
         "as_of": as_of,
         "last_week_trips": last_week_trips,
         "last_week_cancelled": last_week_cancelled,
+        "last_week_cancelled_fines": round(last_week_cancelled_fines, 2),
         "last_week_start": billing_monday,
     }
 
