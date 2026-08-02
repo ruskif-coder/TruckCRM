@@ -1,5 +1,8 @@
-from fastapi import Depends, File, Form, UploadFile
+from typing import List
+
+from fastapi import Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
+from pydantic import BaseModel
 from sqlmodel import Session
 
 from .. import audit, models
@@ -64,6 +67,35 @@ def download_import_template():
 # не урезанный пагинацией "paged") - бэкенд не повторяет фильтры/сортировку,
 # только сериализует присланное в .xlsx. Зона "read" - экспорт ничего не
 # меняет в БД, в отличие от /import выше (зона "write").
+class BulkDeleteRequest(BaseModel):
+    ids: List[int]
+
+
+@router.post("/bulk-delete", dependencies=[Depends(require_zone("trips", "write"))])
+def bulk_delete_trips(
+    payload: BulkDeleteRequest,
+    session: Session = Depends(get_session),
+    user: models.User = Depends(get_current_user),
+):
+    """Массовое удаление рейсов по списку ID. Только staff (write-зона trips)."""
+    if not payload.ids:
+        raise HTTPException(400, "Список ID пуст")
+    deleted = 0
+    for trip_id in payload.ids:
+        trip = session.get(models.Trip, trip_id)
+        if not trip:
+            continue
+        before = trip.model_dump()
+        session.delete(trip)
+        audit.log_action(
+            session, user=user, action="delete", zone="trips",
+            entity_id=trip_id, entity_label=audit.default_label(before), before=before,
+        )
+        deleted += 1
+    session.commit()
+    return {"deleted": deleted}
+
+
 @router.post("/export", dependencies=[Depends(require_zone("trips", "read"))])
 def export_trips_endpoint(payload: models.TripExportRequest):
     content = build_trips_export(payload.rows)

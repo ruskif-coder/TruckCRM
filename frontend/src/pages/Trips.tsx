@@ -667,6 +667,10 @@ export default function Trips() {
   const [pageSize, setPageSize] = useState(50);
   const [page, setPage] = useState(1);
 
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [deleting, setDeleting] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+
   const [importOpen, setImportOpen] = useState(false);
   const [importSource, setImportSource] = useState(SOURCES[0].value);
   const [importCarrier, setImportCarrier] = useState("");
@@ -752,6 +756,51 @@ export default function Trips() {
       await api.downloadPost("/api/trips/export", { rows }, "reestr_poezdok.xlsx");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Ошибка экспорта");
+    }
+  }
+
+  function toggleSelect(id: number) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  // toggleSelectAll вызывается из JSX после объявления paged,
+  // но currentPage передаётся туда через closure — используем ref-паттерн
+  const pagedRef = useRef<Trip[]>([]);
+
+  function toggleSelectAll() {
+    const cur = pagedRef.current;
+    if (cur.every(t => selectedIds.has(t.id))) {
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        cur.forEach(t => next.delete(t.id));
+        return next;
+      });
+    } else {
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        cur.forEach(t => next.add(t.id));
+        return next;
+      });
+    }
+  }
+
+  async function handleBulkDelete() {
+    if (selectedIds.size === 0) return;
+    setDeleting(true);
+    setError(null);
+    try {
+      await api.post("/api/trips/bulk-delete", { ids: Array.from(selectedIds) });
+      setSelectedIds(new Set());
+      setDeleteConfirm(false);
+      await loadAll();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Ошибка удаления");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -843,6 +892,7 @@ export default function Trips() {
   const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const pageClamped = Math.min(page, totalPages);
   const paged = sorted.slice((pageClamped - 1) * pageSize, pageClamped * pageSize);
+  pagedRef.current = paged;
 
   // 2026-06-29: переключатель вкладок передаётся вниз как tabsNav (как
   // Expenses.tsx -> Fuel), рисуется в одной строке с кнопками действия
@@ -881,7 +931,31 @@ export default function Trips() {
         <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
         {tabsNav}
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          {selectedIds.size > 0 && (
+            <>
+              <span style={{ fontSize: 13, color: "var(--smoke)" }}>Выбрано: {selectedIds.size}</span>
+              {deleteConfirm ? (
+                <>
+                  <span style={{ fontSize: 13, color: "var(--ember)" }}>Удалить {selectedIds.size} рейс(ов)?</span>
+                  <button className="pill-btn" style={{ borderColor: "var(--ember)", color: "var(--ember)" }}
+                    onClick={() => setDeleteConfirm(false)}>Отмена</button>
+                  <button className="pill-btn solid" style={{ background: "var(--ember)", borderColor: "var(--ember)" }}
+                    disabled={deleting} onClick={handleBulkDelete}>
+                    {deleting ? "Удаление..." : "Подтвердить"}
+                  </button>
+                </>
+              ) : (
+                <button className="pill-btn" style={{ borderColor: "var(--ember)", color: "var(--ember)" }}
+                  onClick={() => setDeleteConfirm(true)}>
+                  Удалить выбранные
+                </button>
+              )}
+              <button className="pill-btn" onClick={() => { setSelectedIds(new Set()); setDeleteConfirm(false); }}>
+                Снять выделение
+              </button>
+            </>
+          )}
           <button className="pill-btn" onClick={handleExport} disabled={sorted.length === 0}>
             <Icon name="download" size={17} /> <span className="lbl-hide">Экспорт</span>
           </button>
@@ -1122,6 +1196,13 @@ export default function Trips() {
               <table>
                 <thead>
                   <tr>
+                    <th style={{ width: 36, padding: "0 8px" }}>
+                      <input type="checkbox"
+                        checked={paged.length > 0 && paged.every(t => selectedIds.has(t.id))}
+                        onChange={toggleSelectAll}
+                        title="Выбрать все на странице"
+                      />
+                    </th>
                     <Th label="Источник" sortKeyName="source" />
                     <Th label="Перевозчик" sortKeyName="carrier_name" />
                     <Th label="№ заявки" sortKeyName="request_number" />
@@ -1138,7 +1219,13 @@ export default function Trips() {
                 </thead>
                 <tbody>
                   {paged.map((t) => (
-                    <tr key={t.id}>
+                    <tr key={t.id} style={selectedIds.has(t.id) ? { background: "var(--iris-pale, rgba(86,131,218,.08))" } : undefined}>
+                      <td style={{ width: 36, padding: "0 8px" }}>
+                        <input type="checkbox"
+                          checked={selectedIds.has(t.id)}
+                          onChange={() => toggleSelect(t.id)}
+                        />
+                      </td>
                       <td>
                         <SourceTag source={t.source} />
                       </td>
