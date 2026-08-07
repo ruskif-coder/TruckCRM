@@ -9,7 +9,7 @@
 // CRUD 2026-06-23) хедер того же визуального стиля (.pagehead/.pill-btn), но
 // со своими кнопками-действиями, поэтому каждая страница рисует его сама
 // внутри своего JSX, а не через META/Outlet.
-import { type CSSProperties, useEffect, useRef, useState } from "react";
+import { type CSSProperties, useEffect, useRef, useState, useCallback } from "react";
 import { NavLink, Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { api } from "../api";
 import { useAuth } from "../auth/AuthContext";
@@ -108,6 +108,43 @@ export default function AppShell() {
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
   const meta = META[pathname];
+
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const touchStartX = useRef<number | null>(null);
+
+  // Закрывать drawer при смене маршрута
+  useEffect(() => { setDrawerOpen(false); }, [pathname]);
+
+  // Scroll lock body
+  useEffect(() => {
+    if (drawerOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [drawerOpen]);
+
+  // Escape
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setDrawerOpen(false); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+
+  // Свайп влево — закрыть
+  const onTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  }, []);
+  const onTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (touchStartX.current === null) return;
+    const dx = touchStartX.current - e.changedTouches[0].clientX;
+    if (dx > 60) setDrawerOpen(false);
+    touchStartX.current = null;
+  }, []);
+
+  const activeLabel = NAV.find(n => n.to === "/" ? pathname === "/" : pathname.startsWith(n.to))?.label ?? "Автопарк";
 
   // Счётчик открытых заявок на ремонт — показывается как бейдж на пункте «Ремонт».
   const [openCount, setOpenCount] = useState(0);
@@ -577,41 +614,122 @@ export default function AppShell() {
         <Outlet />
       </main>
 
-      <nav className="botnav">
-        {visibleNav.map((n) => (
-          <NavLink
-            key={n.to}
-            to={n.to}
-            end={n.to === "/"}
-            className={({ isActive }) => "bn" + (isActive ? " active" : "")}
-            style={{ position: "relative" }}
+      {/* ── Мобильная шапка (скрыта на desktop) ── */}
+      <header className="mob-header">
+        <button
+          className="mob-burger"
+          aria-expanded={drawerOpen}
+          aria-label="Открыть меню"
+          onClick={() => setDrawerOpen(true)}
+        >
+          <span /><span /><span style={{ width: 11 }} />
+        </button>
+        <div className="mob-title">
+          <div className="mob-supertitle">Автопарк</div>
+          <div className="mob-section">{activeLabel}</div>
+        </div>
+        <button
+          className="mob-icon-btn"
+          title="Уведомления"
+          onClick={() => { setDrawerOpen(false); setShowNotif(v => !v); }}
+        >
+          <Icon name="bell" size={19} />
+          {hasNotif && <span className="mob-dot" />}
+        </button>
+        <button
+          className="mob-avatar"
+          title={user?.full_name || user?.username}
+          onClick={() => setDrawerOpen(true)}
+        >
+          {initial}
+          {hasNotif && <span className="mob-dot" style={{ top: 0, right: 0 }} />}
+        </button>
+      </header>
+
+      {/* ── Drawer overlay ── */}
+      <div
+        className={"mob-overlay" + (drawerOpen ? " open" : "")}
+        onClick={() => setDrawerOpen(false)}
+      />
+
+      {/* ── Drawer ── */}
+      <div
+        ref={drawerRef}
+        className={"mob-drawer" + (drawerOpen ? " open" : "")}
+        role="dialog"
+        aria-modal="true"
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
+      >
+        {/* Профиль */}
+        <div className="mob-drawer-profile">
+          <div className="mob-drawer-avatar">{initial}</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: "#0f1115", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {user?.full_name || user?.username}
+            </div>
+            <div style={{ fontSize: 12, color: "#8a8f98" }}>
+              {ROLE_LABEL[user?.role ?? ""] ?? user?.role}
+            </div>
+          </div>
+          <button
+            className="mob-drawer-close"
+            aria-label="Закрыть меню"
+            onClick={() => setDrawerOpen(false)}
           >
-            <Icon name={n.icon} size={24} /> {n.label}
-            {n.to === "/repairs" && openCount > 0 && (
-              <span style={{
-                position: "absolute", top: 4, right: 4,
-                background: "#e74c3c", color: "#fff",
-                borderRadius: "50%", fontSize: 9, fontWeight: 700,
-                width: 14, height: 14, lineHeight: "14px",
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}>
-                {openCount > 9 ? "9+" : openCount}
-              </span>
-            )}
-            {n.to === "/expenses" && compPendingCount > 0 && (
-              <span style={{
-                position: "absolute", top: 4, right: 4,
-                background: "#d99a3a", color: "#fff",
-                borderRadius: "50%", fontSize: 9, fontWeight: 700,
-                width: 14, height: 14, lineHeight: "14px",
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}>
-                {compPendingCount > 9 ? "9+" : compPendingCount}
-              </span>
-            )}
-          </NavLink>
-        ))}
-      </nav>
+            <span /><span />
+          </button>
+        </div>
+
+        {/* Навигация */}
+        <div className="mob-drawer-nav">
+          {visibleNav.map((n) => {
+            const isActive = n.to === "/" ? pathname === "/" : pathname.startsWith(n.to);
+            return (
+              <NavLink
+                key={n.to}
+                to={n.to}
+                end={n.to === "/"}
+                className={"mob-nav-item" + (isActive ? " active" : "")}
+              >
+                <Icon name={n.icon} size={18} />
+                <span style={{ flex: 1 }}>{n.label}</span>
+                {n.to === "/repairs" && openCount > 0 && (
+                  <span className="mob-badge" style={{ background: "#f97362" }}>{openCount > 9 ? "9+" : openCount}</span>
+                )}
+                {n.to === "/expenses" && compPendingCount > 0 && (
+                  <span className="mob-badge" style={{ background: "#d99a3a" }}>{compPendingCount > 9 ? "9+" : compPendingCount}</span>
+                )}
+              </NavLink>
+            );
+          })}
+
+          <div className="mob-drawer-sep" />
+
+          <button className="mob-nav-item" onClick={() => { setDrawerOpen(false); setShowNotif(v => !v); }}>
+            <Icon name="bell" size={18} />
+            <span style={{ flex: 1 }}>Уведомления</span>
+            {hasNotif && <span className="mob-badge" style={{ background: "#ffe1da", color: "#c4462f" }}>
+              {openCount + compPendingCount + expiryItems.length}
+            </span>}
+          </button>
+
+          <button className="mob-nav-item" onClick={() => { toggleTheme(); }}>
+            <span style={{ width: 18, textAlign: "center", fontSize: 16 }}>{theme === "light" ? "🌙" : "☀️"}</span>
+            <span style={{ flex: 1 }}>Тема</span>
+            <span style={{ fontSize: 13, color: "#8a8f98" }}>{theme === "light" ? "Светлая" : "Тёмная"}</span>
+          </button>
+
+          <button className="mob-nav-item" style={{ color: "#e0574a" }} onClick={handleLogout}>
+            <Icon name="logout" size={18} />
+            <span>Выйти</span>
+          </button>
+        </div>
+
+        <div style={{ padding: "0 20px 24px", fontSize: 11, color: "#b3b8c0" }}>
+          Автопарк
+        </div>
+      </div>
     </div>
   );
 }
