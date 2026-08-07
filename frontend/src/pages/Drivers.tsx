@@ -232,6 +232,7 @@ export default function Drivers({ tabsNav }: { tabsNav?: ReactNode } = {}) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [hideInactive, setHideInactive] = useState(true);
 
   // Множество driver_id, у которых уже есть учётка (role=driver) - только
   // для отображения "Сбросить пароль" вместо "Создать аккаунт"; грузится из
@@ -508,11 +509,12 @@ export default function Drivers({ tabsNav }: { tabsNav?: ReactNode } = {}) {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return drivers;
-    return drivers.filter((d) =>
-      [fullName(d), d.phone, d.email, d.passport_number, d.license_number].some((v) => (v || "").toLowerCase().includes(q))
-    );
-  }, [drivers, search]);
+    return drivers.filter((d) => {
+      if (hideInactive && !d.active) return false;
+      if (q && ![fullName(d), d.phone, d.email, d.passport_number, d.license_number].some((v) => (v || "").toLowerCase().includes(q))) return false;
+      return true;
+    });
+  }, [drivers, search, hideInactive]);
 
   // Карточный список (.drow): по умолчанию по ФИО, при balanceSort — по балансу.
   const sorted = useMemo(() => {
@@ -616,6 +618,22 @@ export default function Drivers({ tabsNav }: { tabsNav?: ReactNode } = {}) {
               onChange={(e) => setSearch(e.target.value)}
               style={{ maxWidth: 300 }}
             />
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, paddingBottom: 2 }}>
+            <input
+              type="checkbox"
+              id="hide-inactive-drivers"
+              checked={hideInactive}
+              onChange={(e) => setHideInactive(e.target.checked)}
+            />
+            <label htmlFor="hide-inactive-drivers" style={{ fontSize: 13, cursor: "pointer", userSelect: "none" }}>
+              Скрыть неактивных
+              {hideInactive && drivers.filter(d => !d.active).length > 0 && (
+                <span style={{ marginLeft: 6, color: "var(--smoke)", fontWeight: 400 }}>
+                  ({drivers.filter(d => !d.active).length} скрыто)
+                </span>
+              )}
+            </label>
           </div>
           {Object.keys(balanceMap).length > 0 && (
             <div style={{ display: "flex", gap: 20, fontSize: 13, paddingBottom: 2, flexWrap: "wrap" }}>

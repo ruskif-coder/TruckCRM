@@ -68,6 +68,10 @@ def post_fuel_to_expenses(
     user: models.User = Depends(get_current_user),
 ):
     fuel_records = session.exec(select(models.FuelRecord)).all()
+    truck_map: dict[int, str] = {
+        t.id: (t.plate or t.label or f"#{t.id}")
+        for t in session.exec(select(models.Truck)).all()
+    }
 
     groups: dict[tuple[int, date_type, str], float] = {}
     skipped_no_truck = 0
@@ -87,17 +91,28 @@ def post_fuel_to_expenses(
         ).all()
     }
 
+    from datetime import timedelta
+
     created = 0
     updated = 0
     for (truck_id, week_monday, bank), total_amount in groups.items():
         source_key = f"fuel:{truck_id}:{week_monday.isoformat()}:{bank}"
         period = f"{week_monday.month:02d}-{week_monday.year}"
+        week_sunday = week_monday + timedelta(days=6)
+        plate = truck_map.get(truck_id, f"#{truck_id}")
+        purpose = (
+            f"Топливо {plate} "
+            f"{week_monday.strftime('%d.%m.%y')}–{week_sunday.strftime('%d.%m.%y')}"
+        )
         entry = existing.get(source_key)
         if entry:
             entry.expense = total_amount
             entry.date = week_monday
             entry.period = period
             entry.vat_amount = entry.expense * (entry.vat_pct or 0) / 100
+            # purpose обновляем только если он ещё содержит старый шаблонный текст
+            if "см. страницу" in (entry.purpose or ""):
+                entry.purpose = purpose
             session.add(entry)
             updated += 1
         else:
@@ -112,7 +127,7 @@ def post_fuel_to_expenses(
                 vat_amount=0,
                 truck_id=truck_id,
                 category="Топливо",
-                purpose="Топливо за неделю (авто, см. страницу «Топливо»)",
+                purpose=purpose,
                 fuel_source_key=source_key,
             )
             session.add(entry)
