@@ -2208,7 +2208,7 @@ export default function DriverDashboard() {
                         </div>
                         {doc?.scan_path ? (
                           <a
-                            href={fileUrl(`/truck-scans/${doc.scan_path}`)}
+                            href={fileUrl(doc.scan_path.startsWith("/") ? doc.scan_path : `/truck-scans/${doc.scan_path}`)}
                             download
                             target="_blank"
                             rel="noreferrer"
