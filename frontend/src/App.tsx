@@ -1,12 +1,12 @@
 import type { ReactNode } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import ProtectedRoute from "./components/ProtectedRoute";
-import AppShell from "./components/AppShell";
+// [старый интерфейс отключён 2026-08-09 — см. блок маршрутов ниже] import AppShell from "./components/AppShell";
 import ConsentModal from "./components/ConsentModal";
 import { AuthProvider, useAuth } from "./auth/AuthContext";
 import { ThemeProvider } from "./theme/ThemeContext";
-import Dashboard from "./pages/Dashboard";
-import Directories from "./pages/Directories";
+// [старый интерфейс отключён 2026-08-09] import Dashboard from "./pages/Dashboard";
+// [старый интерфейс отключён 2026-08-09] import Directories from "./pages/Directories";
 import DriverDashboard from "./pages/DriverDashboard";
 import DriverTrips from "./pages/DriverTrips";
 import ForemanDashboard from "./pages/ForemanDashboard";
@@ -29,13 +29,13 @@ import NewDashSettingsUsers from "./pages/newdash/NewDashSettingsUsers";
 import NewDashSettingsRoles from "./pages/newdash/NewDashSettingsRoles";
 import NewDashSettingsLog from "./pages/newdash/NewDashSettingsLog";
 import NewDashSettingsCategories from "./pages/newdash/NewDashSettingsCategories";
-import Expenses from "./pages/Expenses";
+// [старый интерфейс отключён 2026-08-09] import Expenses from "./pages/Expenses";
 import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword";
-import Repairs from "./pages/Repairs";
-import Reports from "./pages/Reports";
-import Settings from "./pages/Settings";
-import Trips from "./pages/Trips";
+// [старый интерфейс отключён 2026-08-09] import Repairs from "./pages/Repairs";
+// [старый интерфейс отключён 2026-08-09] import Reports from "./pages/Reports";
+// [старый интерфейс отключён 2026-08-09] import Settings from "./pages/Settings";
+// [старый интерфейс отключён 2026-08-09] import Trips from "./pages/Trips";
 
 // Отображает ConsentModal поверх всего контента, если пользователь вошёл,
 // но ещё не дал согласие с ПД. Обновляет AuthContext через setUser после
@@ -223,6 +223,13 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+          {/* Старый интерфейс (AppShell) ОТКЛЮЧЁН 2026-08-09: админа/логиста
+             постоянно «выкидывало» на него при заходе на корень «/». Теперь
+             корень редиректит по роли на /newdash (и /driver, /foreman), а все
+             старые пути ловит catch-all «*» ниже. Чтобы вернуть старый UI —
+             раскомментировать блок ниже и импорты AppShell/Dashboard/…/Trips. */}
+          <Route path="/" element={<RoleRedirect />} />
+          {/*
           <Route
             path="/"
             element={
@@ -239,7 +246,8 @@ export default function App() {
             <Route path="reports" element={<Reports />} />
             <Route path="settings" element={<Settings />} />
           </Route>
-          {/* Любой неизвестный URL — редирект по роли, не слепой Navigate to="/" */}
+          */}
+          {/* Любой неизвестный URL (в т.ч. старые пути) — редирект по роли */}
           <Route path="*" element={<RoleRedirect />} />
         </Routes>
         </ConsentGate>
