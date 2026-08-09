@@ -485,10 +485,28 @@ function HandoverSheet({
   }
 
   async function handleSubmit() {
-    setAttempted(true);
     const truckId = selectedTruckId ?? activeSession?.truck_id;
     if (!truckId) return;
-    if (!odometer || Number(odometer) <= 0) { setStep(1); return; }
+    // Валидация полноты акта: пробег + все пункты чеклиста + чистота + такелаж
+    // + фото 4 сторон. Гард был утерян при рефакторинге 1.5.0 — из-за этого
+    // пустой акт «проходил» (все status="") и сессия открывалась пустой.
+    const noOdo = !odometer || Number(odometer) <= 0;
+    const totalEmpty = [...block1, ...block2, ...equipment].filter(it => it.status === "").length;
+    const noRigging = rigging.some(it => it.status === "");
+    const noClean = cleanItems.some(it => it.status === "");
+    const noSidePhotos = sidePhotos.some(sp => !sp.photoPath);
+    if (noOdo || totalEmpty > 0 || noRigging || noClean || noSidePhotos) {
+      setAttempted(true);
+      const parts: string[] = [];
+      if (noOdo) parts.push("укажите пробег");
+      if (totalEmpty > 0) parts.push(`не отмечено ${totalEmpty} позиц${totalEmpty === 1 ? "ия" : totalEmpty < 5 ? "ии" : "ий"} — подсвечены выше`);
+      if (noRigging) parts.push("заполните раздел Такелаж");
+      if (noClean) parts.push("укажите чистоту салона и внешнего вида");
+      if (noSidePhotos) parts.push("добавьте фото со всех 4 сторон");
+      setSubmitError(parts.map((p, i) => i === 0 ? p[0].toUpperCase() + p.slice(1) : p).join("; "));
+      if (noOdo) setStep(1);
+      return;
+    }
     const allItems = [
       ...block1.map(it => ({ block: 1, label: it.label, status: it.status, note: it.note ?? "" })),
       ...block2.map((it, i) => ({ block: 2, label: it.label, status: it.status, note: it.note ?? "", item_count: block2count[i] || null })),
