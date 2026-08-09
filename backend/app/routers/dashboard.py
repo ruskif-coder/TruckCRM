@@ -176,15 +176,67 @@ def dashboard(
             fuel_by_week[wk] += f.amount or 0
             fuel_volume_by_week[wk] += f.volume or 0
 
+    # Выручка (нетто) по неделям — параллельно trips_by_week.
+    revenue_by_week = {ws: 0.0 for ws in week_starts}
+    for t in trips:
+        if not t.dep_at:
+            continue
+        wk = iso_week_monday(t.dep_at.date())
+        if wk in revenue_by_week:
+            revenue_by_week[wk] += net_revenue(t)
+
+    # Пробег по неделям — разбег одометра по каждой машине (последовательные
+    # положительные дельты), дельта относится к неделе более поздней записи.
+    km_by_week = {ws: 0.0 for ws in week_starts}
+    logs_by_truck: dict = defaultdict(list)
+    for lg in mileage_logs:
+        if lg.odometer is not None and lg.date:
+            logs_by_truck[lg.truck_id].append(lg)
+    for _tid, logs in logs_by_truck.items():
+        logs.sort(key=lambda x: x.date)
+        for prev, cur in zip(logs, logs[1:]):
+            delta = (cur.odometer or 0) - (prev.odometer or 0)
+            if delta <= 0:
+                continue
+            wk = iso_week_monday(cur.date)
+            if wk in km_by_week:
+                km_by_week[wk] += delta
+
     trips_trend = [
         {"d": _week_bar_label(ws), "v": trips_by_week[ws], "hi": ws == week_starts[-1]} for ws in week_starts
     ]
     fuel_values = [fuel_by_week[ws] for ws in week_starts]
     fuel_volumes = [fuel_volume_by_week[ws] for ws in week_starts]
     fuel_peak_idx = max(range(len(fuel_values)), key=lambda i: fuel_values[i]) if any(fuel_values) else len(fuel_values) - 1
+    trend_labels = [_week_bar_label(ws) for ws in week_starts]
+
+    def _peak(vals):
+        return max(range(len(vals)), key=lambda i: vals[i]) if any(vals) else len(vals) - 1
+
     trend = {
         "trips": trips_trend,
         "trips_total": sum(trips_by_week.values()),
+        # Метрики графика «динамика по неделям» (2026-08): 3 переключателя.
+        "metrics": {
+            "trips": {
+                "values": [trips_by_week[ws] for ws in week_starts],
+                "labels": trend_labels, "unit": "рейс.",
+                "total": sum(trips_by_week.values()),
+                "peak_idx": _peak([trips_by_week[ws] for ws in week_starts]),
+            },
+            "revenue": {
+                "values": [round2(revenue_by_week[ws]) for ws in week_starts],
+                "labels": trend_labels, "unit": "₽",
+                "total": round2(sum(revenue_by_week.values())),
+                "peak_idx": _peak([revenue_by_week[ws] for ws in week_starts]),
+            },
+            "km": {
+                "values": [round2(km_by_week[ws]) for ws in week_starts],
+                "labels": trend_labels, "unit": "км",
+                "total": round2(sum(km_by_week.values())),
+                "peak_idx": _peak([km_by_week[ws] for ws in week_starts]),
+            },
+        },
         "fuel": {
             "days": fuel_values,
             # Литры по неделям (2026-06-28) - для подсказки при наведении на

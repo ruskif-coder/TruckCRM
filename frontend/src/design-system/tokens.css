@@ -1,0 +1,142 @@
+/* =================================================================
+   Transport CRM — Design Tokens
+   Источник: design_handoff_fleet_crm/reference/tokens.css
+   ================================================================= */
+
+:root {
+  /* Surfaces */
+  --bg:        #EFEFED;
+  --surface:   #FFFFFF;
+  --surface-2: #F2F2F0;
+  --surface-3: #F6F6F4;
+  --surface-4: #FAFAF8;
+
+  /* Ink */
+  --invert:       #0E0E0E;
+  --on-invert:    #F2F2F0;
+  --on-invert-dim: rgba(255, 255, 255, .45);
+  --ink:        #0E0E0E;
+  --text-2:     #6B6E72;
+  --text-3:     #8A8F98;
+  --text-4:     #B4B8BE;
+
+  /* Оверлей модалок / bottom-sheet */
+  --overlay:    rgba(0, 0, 0, .4);
+
+  /* Accent — лайм */
+  --accent:       #D8F24B;
+  --accent-hover: #E6FF66;
+  --accent-ink:   #5B6B12;
+  --on-accent:    #0E0E0E;
+
+  /* Lines & handles */
+  --line:        rgba(0, 0, 0, .07);
+  --line-row:    rgba(0, 0, 0, .05);
+  --line-strong: rgba(0, 0, 0, .12);
+  --line-head:   rgba(0, 0, 0, .10);
+  --handle:      rgba(0, 0, 0, .14);
+  --edit-dash:   rgba(0, 0, 0, .22);
+
+  /* Bar / progress */
+  --bar:      #E4E4E0;
+  --bar-dim:  #C9C9C4;
+  --bar-done: #EDEEEA;
+  --swatch-mute: #D9DAD6;
+
+  /* Semantic */
+  --success:        #2E7D4F;
+  --success-strong: #1F5C39;
+  --success-bg:     #EAF4EC;
+
+  --warn:     #8A6D17;
+  --warn-bg:  #F5F1E2;
+  --warn-dot: #F2C14B;
+
+  --danger:        #C4523F;
+  --danger-strong: #8C2F1F;
+  --danger-bg:     #FBEEEA;
+  --danger-dot:    #F2685C;
+
+  /* Selection */
+  --row-selected: #F7FBE8;
+
+  /* Shadows */
+  --shadow-card:  0 1px 3px rgba(0, 0, 0, .04);
+  --shadow-menu:  18px 0 44px rgba(0, 0, 0, .16);
+  --shadow-modal: 0 24px 64px rgba(0, 0, 0, .28);
+
+  /* Radius */
+  --r-xs: 7px;
+  --r-sm: 9px;
+  --r-md: 11px;
+  --r-lg: 14px;
+  --r-xl: 16px;
+  --r-2xl: 18px;
+  --r-sheet: 20px;
+
+  /* Motion */
+  --dur-instant: 90ms;
+  --dur-fast:    140ms;
+  --dur-base:    200ms;
+  --dur-slow:    280ms;
+  --ease-standard: cubic-bezier(.2, 0, 0, 1);
+  --ease-exit:     cubic-bezier(.4, 0, 1, 1);
+  --ease-inout:    cubic-bezier(.4, 0, .2, 1);
+
+  /* Typography */
+  --font-ui:   'Onest', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+}
+
+[data-theme="dark"] {
+  --bg:        #131412;
+  --surface:   #1C1E1B;
+  --surface-2: #2B2E29;
+  --surface-3: #262924;
+  --surface-4: #212420;
+
+  --invert:    #D8F24B;
+  --on-invert: #0E0E0E;
+  --on-invert-dim: rgba(14, 14, 14, .55);
+  --overlay:   rgba(0, 0, 0, .6);
+  --ink:       #EDEEE9;
+  --text-2:    #A2A69C;
+  --text-3:    #8D9289;
+  --text-4:    #6E7268;
+
+  --accent:       #D8F24B;
+  --accent-hover: #E6FF66;
+  --accent-ink:   #D8F24B;
+  --on-accent:    #0E0E0E;
+
+  --line:        rgba(255, 255, 255, .09);
+  --line-row:    rgba(255, 255, 255, .07);
+  --line-strong: rgba(255, 255, 255, .16);
+  --line-head:   rgba(255, 255, 255, .14);
+  --handle:      rgba(255, 255, 255, .20);
+  --edit-dash:   rgba(255, 255, 255, .30);
+
+  --bar:         #34372F;
+  --bar-dim:     #494D44;
+  --bar-done:    #2B2E29;
+  --swatch-mute: #4A4E45;
+
+  --success:        #77C79A;
+  --success-strong: #77C79A;
+  --success-bg:     #1B2E22;
+
+  --warn:     #E0C46A;
+  --warn-bg:  #332C18;
+  --warn-dot: #F2C14B;
+
+  --danger:        #F0907B;
+  --danger-strong: #F0907B;
+  --danger-bg:     #33201B;
+  --danger-dot:    #F2685C;
+
+  --row-selected: #23281A;
+
+  --shadow-card:  none;
+  --shadow-menu:  18px 0 44px rgba(0, 0, 0, .55);
+  --shadow-modal: 0 24px 64px rgba(0, 0, 0, .60);
+}

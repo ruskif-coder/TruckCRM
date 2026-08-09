@@ -10,6 +10,25 @@ import Directories from "./pages/Directories";
 import DriverDashboard from "./pages/DriverDashboard";
 import DriverTrips from "./pages/DriverTrips";
 import ForemanDashboard from "./pages/ForemanDashboard";
+import NewDash from "./pages/newdash/NewDash";
+import NewDashTrips from "./pages/newdash/NewDashTrips";
+import NewDashMileage from "./pages/newdash/NewDashMileage";
+import NewDashActs from "./pages/newdash/NewDashActs";
+import NewDashVehicles from "./pages/newdash/NewDashVehicles";
+import NewDashDrivers from "./pages/newdash/NewDashDrivers";
+import NewDashExpenses from "./pages/newdash/NewDashExpenses";
+import NewDashFuel from "./pages/newdash/NewDashFuel";
+import NewDashClaims from "./pages/newdash/NewDashClaims";
+import NewDashReports from "./pages/newdash/NewDashReports";
+import NewDashCarriers from "./pages/newdash/NewDashCarriers";
+import NewDashRefCarriers from "./pages/newdash/NewDashRefCarriers";
+import NewDashCounterparties from "./pages/newdash/NewDashCounterparties";
+import NewDashRepair from "./pages/newdash/NewDashRepair";
+import NewDashSettingsProfile from "./pages/newdash/NewDashSettingsProfile";
+import NewDashSettingsUsers from "./pages/newdash/NewDashSettingsUsers";
+import NewDashSettingsRoles from "./pages/newdash/NewDashSettingsRoles";
+import NewDashSettingsLog from "./pages/newdash/NewDashSettingsLog";
+import NewDashSettingsCategories from "./pages/newdash/NewDashSettingsCategories";
 import Expenses from "./pages/Expenses";
 import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword";
@@ -49,7 +68,7 @@ function RoleRedirect() {
   if (!user) return <Navigate to="/login" replace />;
   if (user.role === "driver")  return <Navigate to="/driver"  replace />;
   if (user.role === "foreman") return <Navigate to="/foreman" replace />;
-  return <Navigate to="/" replace />;
+  return <Navigate to="/newdash" replace />;
 }
 
 export default function App() {
@@ -77,6 +96,124 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+          {/* Новый рабочий стол логиста — standalone, без AppShell (/newdash) */}
+          <Route
+            path="/newdash"
+            element={
+              <ProtectedRoute>
+                <NewDash />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/newdash/trips"
+            element={
+              <ProtectedRoute>
+                <NewDashTrips />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/newdash/trips/mileage"
+            element={
+              <ProtectedRoute>
+                <NewDashMileage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/newdash/trips/acts"
+            element={
+              <ProtectedRoute>
+                <NewDashActs />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/newdash/cars"
+            element={
+              <ProtectedRoute>
+                <NewDashVehicles />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/newdash/drivers"
+            element={
+              <ProtectedRoute>
+                <NewDashDrivers />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/newdash/finance"
+            element={
+              <ProtectedRoute>
+                <NewDashExpenses />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/newdash/finance/fuel"
+            element={
+              <ProtectedRoute>
+                <NewDashFuel />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/newdash/finance/claims"
+            element={
+              <ProtectedRoute>
+                <NewDashClaims />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/newdash/reports"
+            element={
+              <ProtectedRoute>
+                <NewDashReports />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/newdash/reports/carriers"
+            element={
+              <ProtectedRoute>
+                <NewDashCarriers />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/newdash/refs"
+            element={
+              <ProtectedRoute>
+                <NewDashRefCarriers />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/newdash/refs/counterparties"
+            element={
+              <ProtectedRoute>
+                <NewDashCounterparties />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/newdash/repair"
+            element={
+              <ProtectedRoute>
+                <NewDashRepair />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/newdash/settings" element={<ProtectedRoute><NewDashSettingsProfile /></ProtectedRoute>} />
+          <Route path="/newdash/settings/users" element={<ProtectedRoute><NewDashSettingsUsers /></ProtectedRoute>} />
+          <Route path="/newdash/settings/roles" element={<ProtectedRoute><NewDashSettingsRoles /></ProtectedRoute>} />
+          <Route path="/newdash/settings/log" element={<ProtectedRoute><NewDashSettingsLog /></ProtectedRoute>} />
+          <Route path="/newdash/settings/categories" element={<ProtectedRoute><NewDashSettingsCategories /></ProtectedRoute>} />
           {/* Мобильный дашборд бригадира — standalone, без AppShell (2026-07-04) */}
           <Route
             path="/foreman"

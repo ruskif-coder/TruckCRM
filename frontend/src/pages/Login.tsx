@@ -41,8 +41,9 @@ export default function Login() {
     setLoading(true);
     try {
       const u = await login(normalizeUsername(username), password);
-      // Водители и бригадиры — мобильный дашборд, остальные — главная
-      const dest = u.role === "driver" ? "/driver" : u.role === "foreman" ? "/foreman" : "/";
+      // Водители и бригадиры — мобильный кабинет, остальные — новый рабочий стол (/newdash).
+      // Старый интерфейс остаётся доступен по "/" как временный fallback.
+      const dest = u.role === "driver" ? "/driver" : u.role === "foreman" ? "/foreman" : "/newdash";
       navigate(dest, { replace: true });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Не удалось войти");

@@ -2,6 +2,7 @@ import logging
 import uuid
 from datetime import datetime, timedelta
 
+from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import Session, delete, select
@@ -84,6 +85,24 @@ def change_password(
     session.add(user)
     session.commit()
     audit.log_action(session, user=user, action="change_password", zone="auth", entity_id=user.id, entity_label=user.username)
+    return None
+
+
+class _VerifyPwd(BaseModel):
+    password: str
+
+
+@router.post("/verify-password", status_code=204)
+def verify_password_endpoint(
+    payload: _VerifyPwd,
+    user: models.User = Depends(get_current_user),
+):
+    """Подтверждение чувствительного действия паролем ТЕКУЩЕГО пользователя
+    (напр. удаление машины). Только проверяет пароль — ничего не меняет и не
+    выдаёт токен. Неверный пароль → 400 (НЕ 401, иначе фронт разлогинит по
+    глобальному 401-перехватчику; 401 остаётся признаком истёкшей сессии)."""
+    if not verify_password(payload.password, user.password_hash):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Неверный пароль")
     return None
 
 

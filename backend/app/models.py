@@ -575,6 +575,10 @@ class CashFlowEntryBase(SQLModel):
     # Для строк, созданных кнопкой «Принять» на заявке на компенсацию,
     # это — пользователь, нажавший кнопку (он же approved_by_user_id).
     created_by_user_id: Optional[int] = Field(default=None, foreign_key="user.id")
+    # JSON-массив имён файлов в PHOTOS_DIR (/photos/), прикреплённых к расходу.
+    # Колонка заведена через _PENDING_COLUMNS в database.py; читается реестром
+    # «Расходы» (Expenses.tsx) и виджетом «Мои расходы» бригадира.
+    photo_paths: str = ""
 
 
 class CashFlowEntry(CashFlowEntryBase, table=True):
@@ -600,6 +604,7 @@ class CashFlowEntryUpdate(SQLModel):
     counterparty: Optional[str] = None
     purpose: Optional[str] = None
     fuel_source_key: Optional[str] = None
+    photo_paths: Optional[str] = None
 
 
 class CashFlowBulkUpdate(SQLModel):

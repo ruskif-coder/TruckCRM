@@ -1,0 +1,168 @@
+/* =================================================================
+   Transport CRM — Typography
+   Шрифты: Onest (интерфейс) + JetBrains Mono (числа, даты, номера)
+   Файлы лежат в /assets/fonts/ (локально, без CDN)
+   ================================================================= */
+
+@import url('/fonts/font-faces.css');
+
+/* ── Type scale ──────────────────────────────────────────────────
+   Использовать классы .ds-display, .ds-num-xl и т.д.
+   или напрямую через CSS-переменные ниже.
+   ────────────────────────────────────────────────────────────── */
+
+:root {
+  --font-ui:   'Onest', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Courier New', monospace;
+}
+
+/* Базовый сброс шрифта */
+body {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* ── Классы шкалы ── */
+
+/* Главное число — баланс, KPI-герой */
+.ds-display {
+  font-family: var(--font-ui);
+  font-size: 80px;
+  font-weight: 300;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+/* KPI плитки, число в карточке */
+.ds-num-xl {
+  font-family: var(--font-ui);
+  font-size: 38px;
+  font-weight: 300;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Число в виджете */
+.ds-num-m {
+  font-family: var(--font-ui);
+  font-size: 28px;
+  font-weight: 300;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Число в карточке (моб) */
+.ds-num-s {
+  font-family: var(--font-ui);
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Заголовок раздела */
+.ds-h1 {
+  font-family: var(--font-ui);
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+/* Заголовок виджета */
+.ds-h2 {
+  font-family: var(--font-ui);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+}
+
+/* Заголовок на мобильном */
+.ds-h3 {
+  font-family: var(--font-ui);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.3;
+}
+
+/* Основной текст */
+.ds-body {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.ds-body-m {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* Мелкий текст */
+.ds-body-s {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+/* Подпись */
+.ds-caption {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.4;
+  color: var(--text-3);
+}
+
+/* Моно-подпись (заголовок колонки, метка) */
+.ds-mono-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-4);
+}
+
+/* Моно-значение (числа, даты, номера) */
+.ds-mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+.ds-mono-m {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Общее правило: любые числа в таблицах */
+td.num, th.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* Перенос текста */
+h1, h2, h3, h4 {
+  text-wrap: balance;
+}
+p {
+  text-wrap: pretty;
+}

@@ -1,0 +1,78 @@
+/* =================================================================
+   Transport CRM — Animations
+   Источник: design_handoff_fleet_crm/README.md → Animation Tokens
+   ================================================================= */
+
+/* ── Keyframes ── */
+
+@keyframes ds-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes ds-fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes ds-slide-left {
+  from { opacity: 0; transform: translateX(16px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* Рост столбца графика снизу вверх */
+@keyframes ds-grow-y {
+  from { transform: scaleY(0); transform-origin: bottom; }
+  to   { transform: scaleY(1); transform-origin: bottom; }
+}
+
+/* Скелетон-шиммер */
+@keyframes ds-shimmer {
+  from { background-position: -200% 0; }
+  to   { background-position:  200% 0; }
+}
+
+/* Выезд sheet снизу (мобильный bottom sheet) */
+@keyframes ds-sheet-up {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
+/* Выезд drawer слева */
+@keyframes ds-drawer-in {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(0); }
+}
+
+/* Пульс для dot-индикатора */
+@keyframes ds-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: .4; }
+}
+
+/* ── Utility классы ── */
+
+.ds-anim-fade-in  { animation: ds-fade-in  var(--dur-base) var(--ease) both; }
+.ds-anim-fade-up  { animation: ds-fade-up  var(--dur-base) var(--ease) both; }
+.ds-anim-slide-left { animation: ds-slide-left var(--dur-base) var(--ease) both; }
+.ds-anim-sheet-up { animation: ds-sheet-up var(--dur-slow) var(--ease) both; }
+
+/* Задержки для stagger-эффекта */
+.ds-delay-1 { animation-delay: 40ms; }
+.ds-delay-2 { animation-delay: 80ms; }
+.ds-delay-3 { animation-delay: 120ms; }
+.ds-delay-4 { animation-delay: 160ms; }
+.ds-delay-5 { animation-delay: 200ms; }
+
+/* Скелетон */
+.ds-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--surface-2) 25%,
+    var(--surface-4) 50%,
+    var(--surface-2) 75%
+  );
+  background-size: 200% 100%;
+  animation: ds-shimmer 1.4s ease infinite;
+  border-radius: var(--r-sm);
+}

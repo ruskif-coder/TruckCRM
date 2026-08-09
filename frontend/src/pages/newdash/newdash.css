@@ -1,0 +1,1049 @@
+/* ============================================================
+   NewDash — рабочий стол логиста (/newdash).
+   Единый контур стилей. Портировано из design_handoff_fleet_crm/
+   reference/ui.css, но полностью изолировано скоупом `.nd`, чтобы
+   generic-классы (.card/.chip/.status/.modal/.table/.overlay)
+   НЕ конфликтовали с глобальными styles.css приложения.
+   Токены берутся из design-system/tokens.css (уже подключены глобально).
+   Keyframes переименованы с префиксом nd- во избежание коллизий
+   с design-system/animations.css.
+   ============================================================ */
+
+/* ---------- корень-оболочка (заменяет .app + body) ---------- */
+
+.nd {
+  display: flex;
+  height: 100vh;
+  min-width: 1180px;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+}
+.nd *, .nd *::before, .nd *::after { box-sizing: border-box; }
+.nd [hidden] { display: none !important; }
+
+.nd a { color: var(--ink); text-decoration: none; }
+.nd a:hover { color: var(--accent-ink); }
+
+.nd ::-webkit-scrollbar { width: 10px; height: 10px; }
+.nd ::-webkit-scrollbar-thumb { background: var(--handle); border-radius: 5px; border: 3px solid var(--bg); }
+.nd ::-webkit-scrollbar-track { background: transparent; }
+
+/* ---------- typography ---------- */
+
+.nd .t-display { font-size: 76px; font-weight: 300; letter-spacing: -.04em; line-height: .86; font-variant-numeric: tabular-nums; }
+.nd .t-num-xl  { font-size: 44px; font-weight: 300; letter-spacing: -.035em; line-height: .88; font-variant-numeric: tabular-nums; }
+.nd .t-num-l   { font-size: 38px; font-weight: 300; letter-spacing: -.03em;  line-height: .9;  font-variant-numeric: tabular-nums; }
+.nd .t-num-m   { font-size: 24px; font-weight: 300; letter-spacing: -.02em;  line-height: 1;   font-variant-numeric: tabular-nums; }
+.nd .t-num-s   { font-size: 16px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.nd .t-h1      { font-size: 22px; font-weight: 600; letter-spacing: -.02em; }
+.nd .t-h2      { font-size: 15px; font-weight: 600; letter-spacing: -.01em; }
+.nd .t-h3      { font-size: 14px; font-weight: 600; letter-spacing: -.01em; }
+.nd .t-body    { font-size: 13px; font-weight: 400; }
+.nd .t-body-s  { font-size: 12.5px; font-weight: 400; }
+.nd .t-caption { font-size: 11.5px; font-weight: 400; }
+
+.nd .t-mono-label {
+  font: 500 10px/1 var(--font-mono);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--text-4);
+}
+.nd .t-mono { font: 400 12px var(--font-mono); font-variant-numeric: tabular-nums; }
+.nd .t-mono-500 { font: 500 12.5px var(--font-mono); font-variant-numeric: tabular-nums; }
+
+.nd .muted   { color: var(--text-3); }
+.nd .muted-2 { color: var(--text-2); }
+.nd .pos     { color: var(--success); }
+.nd .neg     { color: var(--danger); }
+.nd .num     { font-variant-numeric: tabular-nums; }
+.nd .ellip   { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---------- app shell ---------- */
+
+.nd .menu-slot {
+  position: relative;
+  flex: none;
+  width: 236px;
+  transition: width var(--dur-base) var(--ease-inout);
+}
+.nd .menu-slot[data-pinned="false"] { width: 66px; }
+
+.nd .menu {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 236px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 12px;
+  background: var(--surface);
+  border-right: 1px solid var(--line);
+  overflow: hidden;
+  z-index: 30;
+  transition: width var(--dur-base) var(--ease-inout), box-shadow var(--dur-base) ease;
+}
+.nd .menu[data-open="false"] { width: 66px; }
+.nd .menu[data-floating="true"][data-open="true"] { box-shadow: var(--shadow-menu); }
+
+.nd .menu__brand { display: flex; align-items: center; gap: 12px; padding: 2px 6px 14px; }
+.nd .menu__mark {
+  flex: none; width: 26px; height: 26px; border-radius: 8px;
+  background: var(--ink); display: flex; align-items: center; justify-content: center;
+}
+.nd .menu__mark i { width: 10px; height: 10px; border-radius: 3px; background: var(--accent); display: block; }
+[data-theme="dark"] .nd .menu__mark { background: var(--accent); }
+[data-theme="dark"] .nd .menu__mark i { background: #0E0E0E; }
+
+.nd .menu__item {
+  display: flex; align-items: center; gap: 12px;
+  width: 100%; padding: 9px 8px; border: 0; border-radius: var(--r-md);
+  background: transparent; color: var(--text-2);
+  font: 500 13px/1.2 var(--font-ui); text-align: left; text-decoration: none;
+  white-space: nowrap; cursor: pointer;
+  transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease;
+}
+.nd .menu__item:hover { background: var(--surface-3); color: var(--ink); }
+.nd .menu__item[aria-current="page"] { background: var(--surface-2); color: var(--ink); }
+.nd .menu__icon { flex: none; width: 26px; display: flex; justify-content: center; position: relative; }
+.nd .menu__icon svg { opacity: .6; }
+.nd .menu__item[aria-current="page"] .menu__icon svg { opacity: 1; }
+.nd .menu__label { flex: 1; }
+.nd .menu[data-open="false"] .menu__label,
+.nd .menu[data-open="false"] .menu__badge,
+.nd .menu[data-open="false"] .menu__bell,
+.nd .menu[data-open="false"] .menu__user-text { display: none; }
+.nd .menu[data-open="false"] .menu__item { justify-content: center; }
+
+.nd .menu__badge {
+  flex: none; padding: 4px 6px; border-radius: 6px;
+  background: var(--danger-dot); color: #fff; font: 500 10px/1 var(--font-mono);
+}
+.nd .menu__dot {
+  position: absolute; top: -3px; right: -1px;
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--danger-dot); border: 1.5px solid var(--surface);
+  display: none;
+}
+.nd .menu[data-open="false"] .menu__dot { display: block; }
+/* колокольчик у названия раздела — есть открытые заявки */
+.nd .menu__bell {
+  flex: none; display: inline-flex; align-items: center; gap: 3px;
+  color: var(--danger-dot);
+}
+.nd .menu__bell svg { animation: nd-bell 2.6s var(--ease-standard) infinite; transform-origin: 50% 2px; }
+.nd .menu__bell-count { font: 600 10px/1 var(--font-mono); }
+@keyframes nd-bell {
+  0%, 88%, 100% { transform: rotate(0); }
+  91% { transform: rotate(11deg); }
+  94% { transform: rotate(-9deg); }
+  97% { transform: rotate(5deg); }
+}
+
+.nd .menu__nav {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  scrollbar-width: none;
+}
+.nd .menu__nav::-webkit-scrollbar { width: 0; height: 0; }
+
+/* вложенные страницы раздела (раскрываются под пунктом при наведении) */
+.nd .menu__group { display: flex; flex-direction: column; }
+.nd .menu__sub {
+  display: flex; flex-direction: column; gap: 1px;
+  padding: 2px 0 4px 20px; margin-left: 13px;
+  border-left: 1px solid var(--line);
+  animation: nd-fadeIn var(--dur-fast) ease both;
+}
+.nd .menu[data-open="false"] .menu__sub { display: none; }   /* в свёрнутом рейле под-пункты не показываем */
+.nd .menu__subitem {
+  display: flex; align-items: center; gap: 9px; width: 100%;
+  padding: 7px 8px; border: 0; border-radius: var(--r-sm);
+  background: transparent; color: var(--text-2);
+  font: 500 12.5px var(--font-ui); text-align: left; white-space: nowrap; cursor: pointer;
+  transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease;
+}
+.nd .menu__subitem:hover { background: var(--surface-3); color: var(--ink); }
+.nd .menu__subitem[aria-current="page"] { color: var(--ink); font-weight: 600; }
+.nd .menu__sub-dot { flex: none; width: 5px; height: 5px; border-radius: 50%; background: var(--text-4); }
+.nd .menu__subitem[aria-current="page"] .menu__sub-dot { background: var(--accent); }
+
+.nd .menu__spacer { flex: 1; }
+.nd .menu__user {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 6px 2px; margin-top: 6px; border-top: 1px solid var(--line);
+}
+
+.nd .avatar {
+  flex: none; width: 26px; height: 26px; border-radius: 50%;
+  background: var(--accent); color: var(--on-accent);
+  display: flex; align-items: center; justify-content: center;
+  font: 600 10.5px var(--font-ui);
+}
+.nd .avatar--lg { width: 46px; height: 46px; font-size: 15px; }
+.nd .avatar--square { border-radius: 13px; background: var(--surface-2); color: var(--ink); font-family: var(--font-mono); }
+
+.nd .main { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; padding: 0; margin: 0; }
+
+.nd .topbar {
+  flex: none; display: flex; align-items: center; gap: 14px; flex-wrap: nowrap;
+  padding: 11px 24px; margin: 0; border-bottom: 1px solid var(--line);
+}
+.nd .topbar__title { display: flex; align-items: baseline; gap: 12px; }
+.nd .spacer { flex: 1; }
+
+.nd .contentrow { flex: 1; display: flex; min-height: 0; }
+
+.nd .workarea {
+  flex: 1; min-width: 0; overflow: auto; scrollbar-gutter: stable;
+  padding: 12px 24px 28px;
+  display: grid; grid-template-columns: repeat(12, 1fr);
+  gap: 14px; align-content: start;
+  /* Мозаичная упаковка: мелкая строка + dense-заполнение + align:start
+     (виджеты не растягиваются) — высокий виджет занимает несколько строк, а
+     рядом с ним в ту же колонку встают два малых друг под другом. Пиксельный
+     row-span выставляется из JS по реальной высоте (см. NewDash.tsx). */
+  grid-auto-rows: 8px; grid-auto-flow: row dense; align-items: start;
+}
+
+/* ---------- buttons ---------- */
+
+.nd .btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  border: 0; border-radius: var(--r-md); padding: 10px 15px;
+  background: var(--surface); color: var(--ink);
+  font: 600 12.5px var(--font-ui); white-space: nowrap; cursor: pointer;
+  transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease, transform var(--dur-instant) ease;
+}
+.nd .btn:active { transform: translateY(1px); }
+.nd .btn:hover { opacity: 1; }              /* нейтрализует глобальный .btn:hover{opacity:.88} */
+.nd .btn--primary { background: var(--invert); color: var(--on-invert); }
+.nd .btn--primary:hover { filter: brightness(1.1); }
+.nd .btn--accent { background: var(--accent); color: var(--on-accent); }
+.nd .btn--accent:hover { background: var(--accent-hover); }
+.nd .btn--ghost { background: var(--surface); border: 1px solid var(--line-strong); }
+.nd .btn--ghost:hover { background: var(--surface-3); }
+.nd .btn--quiet { background: transparent; color: var(--text-2); }
+.nd .btn--quiet:hover { color: var(--ink); }
+.nd .btn:disabled { background: var(--bar); color: var(--text-4); cursor: default; opacity: 1; }
+.nd .btn--lg { padding: 13px 18px; font-size: 13px; border-radius: var(--r-lg); }
+.nd .btn--block { width: 100%; }
+
+.nd .icon-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; padding: 0;
+  border: 1px solid var(--line-strong); border-radius: var(--r-sm);
+  background: var(--surface-4); color: var(--text-2); cursor: pointer;
+  transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease;
+}
+.nd .icon-btn:hover { background: var(--surface-2); border-color: var(--line-head); color: var(--ink); }
+.nd .icon-btn--lg { width: 44px; height: 44px; border-radius: 13px; border: 0; background: var(--surface); }
+.nd .icon-btn--plain { width: 32px; height: 32px; border: 0; border-radius: var(--r-md); background: var(--surface-3); color: var(--ink); }
+.nd .icon-btn--accent { border: 0; background: var(--accent); color: var(--on-accent); }
+.nd .icon-btn--accent:hover { background: var(--accent-hover); color: var(--on-accent); }
+
+/* ---------- segmented control ---------- */
+
+.nd .segments {
+  display: inline-flex; gap: 2px; padding: 3px;
+  background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--r-md);
+}
+.nd .segments--flush { background: var(--surface-2); border: 0; }
+.nd .segments__item {
+  border: 0; border-radius: var(--r-sm); padding: 7px 12px;
+  background: transparent; color: var(--text-2);
+  font: 500 12px var(--font-ui); white-space: nowrap; cursor: pointer;
+  transition: background-color var(--dur-base) var(--ease-inout), color var(--dur-fast) ease;
+}
+.nd .segments__item[aria-selected="true"] { background: var(--invert); color: var(--on-invert); font-weight: 600; }
+
+/* ---------- chips ---------- */
+
+.nd .chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 8px 12px; border: 1px solid var(--line-strong); border-radius: var(--r-md);
+  background: var(--surface); color: var(--text-2);
+  font: 500 12.5px var(--font-ui); white-space: nowrap; cursor: pointer;
+  transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease, border-color var(--dur-fast) ease;
+}
+.nd .chip:hover { border-color: var(--line-head); }
+.nd .chip[aria-pressed="true"] { background: var(--invert); color: var(--on-invert); border-color: transparent; }
+.nd .chip__count { font: 500 10px var(--font-mono); opacity: .55; }
+.nd .chip--accent { background: var(--accent); color: var(--on-accent); border-color: transparent; font-family: var(--font-mono); }
+
+.nd .status {
+  display: inline-block; padding: 4px 9px; border-radius: var(--r-xs);
+  font: 600 11px var(--font-ui); white-space: nowrap;
+}
+.nd .status--ok    { background: var(--success-bg); color: var(--success); }
+.nd .status--warn  { background: var(--warn-bg);    color: var(--warn); }
+.nd .status--risk  { background: var(--danger-bg);  color: var(--danger); }
+.nd .status--idle  { background: var(--surface-2);  color: var(--text-2); }
+
+.nd .dot { flex: none; width: 7px; height: 7px; border-radius: 50%; }
+.nd .dot--crit { background: var(--danger-dot); }
+.nd .dot--warn { background: var(--warn-dot); }
+.nd .dot--ok   { background: var(--accent); }
+.nd .dot--off  { background: var(--swatch-mute); }
+
+/* ---------- search field ---------- */
+
+.nd .search {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px; width: 280px;
+  background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--r-md);
+  color: var(--text-3); font-size: 12.5px;
+}
+.nd .search__hint { margin-left: auto; font: 400 10px var(--font-mono); color: var(--text-4); }
+
+/* сброс утечки глобального .field (design-system/components.css — горизонтальная
+   пилюля height:36px/align-items:center/border/padding): иначе поля наезжают,
+   метки центрируются, появляются лишние рамки. */
+.nd .field {
+  display: flex; flex-direction: column; align-items: stretch; gap: 8px;
+  height: auto; padding: 0; margin: 0; border: 0; background: none; border-radius: 0;
+}
+.nd .field:focus-within { box-shadow: none; }
+.nd .field__label { font-size: 11.5px; color: var(--text-3); }
+.nd .field__input,
+.nd .field textarea {
+  width: 100%; padding: 12px;
+  border: 1px solid var(--line-strong); border-radius: var(--r-lg);
+  background: var(--surface-4); color: var(--ink);
+  font: 400 13px/1.45 var(--font-ui); outline: none;
+  transition: border-color var(--dur-fast) ease;
+}
+.nd .field__input:focus,
+.nd .field textarea:focus { border-color: var(--ink); }
+.nd .field__input--amount { font: 400 24px var(--font-mono); padding: 14px; font-variant-numeric: tabular-nums; }
+.nd .field--error .field__input { border-color: var(--danger); }
+.nd .field__error { font-size: 11.5px; color: var(--danger); }
+
+.nd .checkbox {
+  width: 15px; height: 15px; border-radius: 4px;
+  border: 1.5px solid var(--line-head); background: transparent; cursor: pointer; padding: 0;
+  transition: background-color var(--dur-instant) ease, border-color var(--dur-instant) ease;
+}
+.nd .checkbox[aria-checked="true"] { background: var(--accent); border-color: var(--accent); }
+
+/* ---------- widgets ---------- */
+
+.nd .widget {
+  position: relative;
+  background: var(--surface);
+  border-radius: var(--r-2xl);
+  padding: 18px 20px;
+  animation: nd-fadeUp var(--dur-slow) var(--ease-standard) both;
+  /* Виджет — колонка: основной блок контента (таблица/табло/лента) тянется
+     на всю доступную высоту так же, как по ширине. При естественной высоте
+     (мозаика) свободного места нет → размер по контенту; при заданной высоте
+     (ресайз-Y) контент заполняет всё. */
+  display: flex; flex-direction: column; min-height: 0;
+}
+.nd .widget > .table-card,
+.nd .widget > .board__grid { flex: 1 1 auto; min-height: 0; }
+/* Тёмный виджет («Требует внимания») — всегда тёмный фон + светлый текст в
+   ОБЕИХ темах. Через --dossier/--on-dossier: в тёмной теме --on-invert
+   становится тёмным и наследуемый текст (feed__title, заголовок) терялся. */
+.nd .widget--dark { background: var(--dossier); color: var(--on-dossier); }
+[data-theme="dark"] .nd .widget--dark { background: #0B0C0A; box-shadow: inset 0 0 0 1px rgba(216, 242, 75, .28); }
+.nd .widget--bare { background: transparent; padding: 0; }
+
+.nd .widget__head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; margin-bottom: 14px;
+}
+
+.nd .kpi { display: flex; flex-direction: column; gap: 14px; padding: 16px 16px 14px; border-radius: var(--r-lg); }
+.nd .kpi__top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.nd .kpi__value { display: flex; align-items: flex-end; gap: 8px; }
+.nd .kpi__unit { font-size: 12px; color: var(--text-3); padding-bottom: 4px; }
+
+.nd .spark { display: flex; align-items: flex-end; gap: 3px; height: 26px; }
+.nd .spark > i { flex: 1; border-radius: 2px; background: var(--bar); display: block; transform-origin: bottom; }
+.nd .spark > i.is-peak { background: var(--accent); }
+/* пометка «демо» на KPI-плитке без реальных данных */
+.nd .kpi__demo { margin-left: 6px; padding: 1px 5px; border-radius: 4px; background: var(--surface-3); color: var(--text-3); font: 600 8.5px/1.4 var(--font-mono); letter-spacing: .05em; vertical-align: middle; }
+.nd .kpi__demo-note { margin-top: -6px; font-size: 10px; letter-spacing: .02em; }
+
+.nd .chart { display: flex; align-items: flex-end; gap: 2px; height: 150px; padding-bottom: 8px; border-bottom: 1px solid var(--line-strong); }
+.nd .chart > i { flex: 1; border-radius: 3px 3px 0 0; background: var(--bar); display: block; transform-origin: bottom; animation: nd-growY 320ms var(--ease-standard) both; }
+.nd .chart > i.is-peak { background: var(--accent); }
+.nd .chart > i.is-forecast { background: var(--bar-dim); }
+.nd .chart__axis { display: flex; gap: 2px; padding-top: 9px; font: 400 10px var(--font-mono); color: var(--text-3); }
+.nd .chart__axis > span { flex: 1; text-align: center; white-space: nowrap; overflow: hidden; }
+/* Слайдер-переключатель графика — иконки вместо подписей */
+.nd .chart-metrics .segments__item { padding: 6px 9px; display: inline-flex; align-items: center; }
+.nd .chart-metrics .segments__item svg { display: block; opacity: .8; }
+.nd .chart-metrics .segments__item[aria-selected="true"] svg { opacity: 1; }
+
+.nd .feed__item {
+  display: flex; gap: 11px; align-items: flex-start;
+  padding: 11px 10px; border-radius: var(--r-md); cursor: pointer;
+  transition: background-color var(--dur-fast) ease;
+}
+.nd .widget--dark .feed__item:hover { background: rgba(255, 255, 255, .06); }
+.nd .feed__item:hover { background: var(--surface-4); }
+.nd .feed__title { font-size: 13px; font-weight: 500; line-height: 1.35; }
+.nd .feed__meta { font-size: 11.5px; color: var(--text-3); margin-top: 2px; }
+.nd .feed__when { font: 400 11px var(--font-mono); color: var(--text-3); padding-top: 2px; }
+
+.nd .donut {
+  flex: none; width: 118px; height: 118px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: conic-gradient(var(--accent) 0 62%, var(--ink) 62% 84%, var(--bar) 84% 100%);
+}
+.nd .donut__hole {
+  width: 84px; height: 84px; border-radius: 50%; background: var(--surface);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+
+/* ---------- edit mode ---------- */
+
+.nd .workarea[data-edit="true"] .widget { outline: 1.5px dashed var(--edit-dash); }
+.nd .widget[data-dragging="true"] { opacity: .75; outline: 2px solid var(--accent) !important; }
+
+.nd .w-handle,
+.nd .w-remove,
+.nd .w-resize-x,
+.nd .w-resize-y { display: none; }
+.nd .workarea[data-edit="true"] .w-handle,
+.nd .workarea[data-edit="true"] .w-remove,
+.nd .workarea[data-edit="true"] .w-resize-x,
+.nd .workarea[data-edit="true"] .w-resize-y { display: flex; animation: nd-fadeIn var(--dur-fast) ease both; }
+
+.nd .w-handle {
+  position: absolute; top: -9px; left: -6px; z-index: 6;
+  align-items: center; gap: 6px; height: 22px; padding: 0 10px;
+  border: 1px solid var(--line-strong); border-radius: 11px;
+  background: var(--surface); color: var(--ink);
+  font: 500 10px var(--font-mono); cursor: grab; user-select: none;
+}
+.nd .w-handle:active { cursor: grabbing; }
+.nd .w-remove {
+  position: absolute; top: -8px; right: -8px; z-index: 5;
+  align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 1px solid var(--line-strong); background: var(--surface);
+  color: var(--ink); font: 500 13px/1 var(--font-ui); cursor: pointer;
+}
+.nd .w-resize-x {
+  position: absolute; top: 14px; bottom: 14px; right: 2px; z-index: 4;
+  width: 6px; border-radius: 3px; background: var(--handle);
+  cursor: col-resize; border: 0; padding: 0;
+}
+.nd .w-resize-y {
+  position: absolute; left: 16px; right: 16px; bottom: 2px; z-index: 4;
+  height: 6px; border-radius: 3px; background: var(--handle);
+  cursor: row-resize; border: 0; padding: 0;
+}
+.nd .w-resize-x:hover, .nd .w-resize-y:hover { background: var(--accent); }
+.nd .widget--dark .w-resize-x, .nd .widget--dark .w-resize-y { background: rgba(255, 255, 255, .25); }
+
+.nd .settings {
+  flex: none; width: 280px; overflow: auto;
+  padding: 20px 18px; display: flex; flex-direction: column; gap: 14px;
+  background: var(--surface); border-left: 1px solid var(--line);
+  animation: nd-slideLeft var(--dur-base) var(--ease-standard) both;
+}
+.nd .settings__add {
+  display: flex; align-items: center; gap: 10px; padding: 12px;
+  border: 1px dashed rgba(0, 0, 0, .18); border-radius: var(--r-lg);
+  background: var(--surface-4); color: var(--ink);
+  font: 500 13px var(--font-ui); text-align: left; cursor: pointer;
+}
+.nd .settings__add:hover { background: var(--surface-2); }
+.nd .settings__add i {
+  flex: none; width: 22px; height: 22px; border-radius: var(--r-xs);
+  background: var(--accent); color: var(--on-accent);
+  display: flex; align-items: center; justify-content: center;
+  font: 500 13px var(--font-ui); font-style: normal;
+}
+.nd .settings__preset {
+  display: flex; flex-direction: column; gap: 3px; padding: 12px;
+  border: 1px solid var(--line-strong); border-radius: var(--r-lg);
+  background: var(--surface-4); color: var(--ink); text-align: left; cursor: pointer;
+}
+.nd .settings__preset:hover { background: var(--surface-2); }
+
+/* ---------- timeline board ---------- */
+
+.nd .board__grid { position: relative; display: flex; flex-direction: column; gap: 4px; }
+/* Табло можно двигать мышью (панорама времени) */
+.nd .board__grid--pan { cursor: grab; user-select: none; }
+.nd .board__grid--pan:active { cursor: grabbing; }
+.nd .board__grid--pan .trip { cursor: pointer; }
+.nd .board__axis { display: flex; }
+.nd .board__gutter { flex: none; width: 112px; }
+.nd .board__scale { flex: 1; position: relative; height: 20px; }
+.nd .board__tick {
+  position: absolute; top: 0; transform: translateX(-50%);
+  font: 400 10.5px var(--font-mono); color: var(--text-4);
+}
+.nd .board__row { display: flex; align-items: center; }
+.nd .board__name { flex: none; width: 112px; display: flex; align-items: baseline; gap: 6px; padding-right: 10px; }
+.nd .board__lane { flex: 1; position: relative; height: 38px; border-top: 1px solid var(--line-row); }
+.nd .board__gridline { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--line-row); }
+
+.nd .trip {
+  position: absolute; top: 4px; height: 30px;
+  border-radius: var(--r-sm); padding: 4px 10px; overflow: hidden;
+  cursor: pointer; text-align: left; border: 1px solid transparent;
+  transition: filter var(--dur-fast) ease, transform var(--dur-fast) ease;
+}
+.nd .trip:hover { filter: brightness(.94); }
+.nd .trip:active { transform: translateY(1px); }
+.nd .trip__route { font: 600 11px/1.15 var(--font-ui); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nd .trip__meta { font: 400 9.5px var(--font-mono); opacity: .7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nd .trip--done { background: var(--bar-done); color: var(--text-2); border-color: var(--line); }
+.nd .trip--run  { background: var(--accent);   color: var(--on-accent); border-color: var(--line-strong); }
+.nd .trip--next { background: var(--ink);      color: var(--surface); border-color: var(--ink); }
+
+.nd .board__now { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--danger-dot); z-index: 3; }
+.nd .board__now i {
+  position: absolute; top: -2px; left: -3px; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--danger-dot); display: block;
+  animation: nd-pulseDot 2400ms ease-in-out infinite;
+}
+
+/* ---------- flat list (trips in work) ---------- */
+
+.nd .flatlist__head,
+.nd .flatlist__row {
+  display: grid; align-items: center; gap: 10px;
+  grid-template-columns: 100px 1fr 96px 92px 88px;
+}
+.nd .flatlist__head { padding: 0 4px 8px; border-bottom: 1px solid var(--line-row); }
+.nd .flatlist__row { padding: 11px 4px; border-bottom: 1px solid var(--line-row); cursor: pointer; transition: background-color var(--dur-fast) ease; }
+.nd .flatlist__row:hover { background: var(--surface-4); }
+.nd .flatlist__more { display: block; width: 100%; text-align: center; padding: 12px 0 2px; border: 0; background: none; color: var(--text-2); font: 500 12.5px var(--font-ui); cursor: pointer; }
+.nd .flatlist__more:hover { color: var(--ink); }
+
+/* ---------- modal / panel ---------- */
+
+.nd-overlay {
+  position: fixed; inset: 0; z-index: 60;
+  background: rgba(14, 14, 14, .42);
+  display: flex; padding: 16px;
+  animation: nd-fadeIn var(--dur-base) ease both;
+}
+.nd-overlay--right { align-items: center; justify-content: flex-end; }
+.nd-overlay--center { align-items: center; justify-content: center; }
+
+.nd-modal {
+  display: flex; flex-direction: column; max-height: 100%;
+  background: var(--bg); border-radius: 20px; overflow: hidden;
+  box-shadow: var(--shadow-modal); color: var(--ink);
+  font-family: var(--font-ui);
+  animation: nd-fadeUp var(--dur-slow) var(--ease-standard) both;
+}
+.nd-modal--panel { width: 520px; }
+/* padding-right оставляет место под кнопку закрытия (top-right), чтобы статус/контент шапки не налезал на крестик */
+.nd-modal__head { flex: none; padding: 20px 52px 16px 22px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.nd-modal__body { flex: 1; min-height: 0; overflow: auto; padding: 16px 22px 20px; display: flex; flex-direction: column; gap: 14px; }
+.nd-modal__foot { flex: none; display: flex; gap: 8px; padding: 14px 22px 18px; background: var(--surface); border-top: 1px solid var(--line); }
+
+.nd-facts { background: var(--surface); border-radius: var(--r-xl); padding: 6px 18px; }
+.nd-facts__row { display: flex; align-items: center; gap: 14px; padding: 11px 0; border-bottom: 1px solid var(--line-row); }
+.nd-facts__row:last-child { border-bottom: 0; }
+.nd-facts__label { flex: 1; font-size: 12.5px; color: var(--text-3); }
+.nd-facts__value { font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; text-align: right; }
+
+.nd-comment { display: flex; gap: 11px; align-items: flex-start; }
+.nd-comment__bubble { flex: 1; min-width: 0; background: var(--surface-3); border-radius: var(--r-lg); padding: 10px 12px; }
+.nd-comment__text { font-size: 13px; line-height: 1.45; margin-top: 4px; }
+
+/* modal helpers reuse .nd-scope for typography/buttons */
+.nd-modal .t-h1, .nd-modal .t-h2, .nd-modal .t-mono, .nd-modal .t-mono-500,
+.nd-modal .btn, .nd-modal .status, .nd-modal .chip, .nd-modal .avatar,
+.nd-modal .field, .nd-modal .muted, .nd-modal .num, .nd-modal .ellip { font-family: var(--font-ui); }
+
+/* ============================================================
+   Шаблон модалок (MODAL). Расширяет .nd-modal: размеры form/wide/sheet,
+   тёмная шапка-досье, кнопка закрытия, кирпичи тела (facts/form-grid/mark/
+   check-row/act-*). Токен --dossier — тёмная шапка (НЕ --invert: он лаймовый
+   в тёмной теме, аватар исчезнет). Порт reference/ui.css.
+   ============================================================ */
+
+.nd { --dossier: #0E0E0E; --on-dossier: #F2F2F0; }
+[data-theme="dark"] .nd { --dossier: #0B0C0A; --on-dossier: #EDEEE9; }
+
+.nd-modal { position: relative; }
+.nd-modal--form  { width: 420px; background: var(--surface); }
+.nd-modal--wide  { width: 800px; }
+.nd-modal--sheet { width: 760px; }
+.nd-modal__head--dark { background: var(--dossier); color: var(--on-dossier); border-bottom: 0; }
+.nd-modal__head--dark .t-mono-label { color: rgba(255, 255, 255, .45); }
+.nd-modal__head--dark .muted, .nd-modal__head--dark .muted-2 { color: rgba(255, 255, 255, .6); }
+/* .nd префикс — чтобы перекрыть глобальный .icon-btn{position:relative} (styles.css)
+   вне зависимости от порядка загрузки CSS; иначе кнопка уходит в поток (верх-слева) */
+.nd .nd-modal__close { position: absolute; top: 15px; right: 15px; left: auto; z-index: 3; }
+/* кнопки на тёмной шапке-досье */
+.nd .btn--onDossier { background: rgba(255, 255, 255, .1); color: var(--on-dossier); border: 0; }
+.nd .btn--onDossier:hover { background: rgba(255, 255, 255, .18); }
+
+/* кирпичи тела (собираются вместо своей вёрстки) */
+.nd .facts { background: var(--surface); border-radius: var(--r-xl); padding: 6px 18px; }
+.nd .facts__row { display: flex; align-items: center; gap: 14px; padding: 11px 0; border-bottom: 1px solid var(--line-row); }
+.nd .facts__row:last-child { border-bottom: 0; }
+.nd .facts__label { flex: 1; font-size: 12.5px; color: var(--text-3); }
+.nd .facts__value { font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; text-align: right; }
+.nd .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 18px; }
+.nd .form-grid__field--wide { grid-column: span 2; }
+
+/* акт приёмки-сдачи (две колонки) */
+.nd .mark { display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px; border-radius: var(--r-xs); font: 600 11px var(--font-ui); white-space: nowrap; }
+.nd .mark::before { font-size: 10px; line-height: 1; }
+.nd .mark--yes { background: var(--success-bg); color: var(--success); }
+.nd .mark--yes::before { content: "\2713"; }
+.nd .mark--no { background: var(--danger-bg); color: var(--danger); }
+.nd .mark--no::before { content: "\2715"; }
+.nd .mark--none { background: transparent; color: var(--text-4); font-weight: 500; }
+.nd .check-row { display: flex; align-items: center; gap: 10px; padding: 11px 0; border-bottom: 1px solid var(--line-row); }
+.nd .check-row:last-child { border-bottom: 0; }
+.nd .check-row__name { flex: 1; min-width: 0; font-size: 13px; }
+.nd .check-row__note { font: 400 12px var(--font-mono); color: var(--text-3); }
+.nd .act-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 24px; }
+.nd .act-col { min-width: 0; }
+.nd .act-col__head { display: flex; align-items: center; gap: 8px; padding-bottom: 10px; margin-bottom: 4px; border-bottom: 2px solid var(--line-strong); font: 600 14px var(--font-ui); }
+.nd .act-col--in .act-col__head { border-bottom-color: var(--success); color: var(--success); }
+.nd .act-col--out .act-col__head { border-bottom-color: var(--ink); color: var(--ink); }
+.nd .act-group { padding: 14px 0 4px; }
+.nd .act-group__title { margin-bottom: 2px; }
+
+/* секция-карточка тела модалки (белая на сером фоне окна) */
+.nd .section { background: var(--surface); border-radius: var(--r-xl); padding: 16px 18px 18px; }
+.nd .section__title { margin-bottom: 12px; }
+
+/* facts-грид в шапке акта (горизонтальный, подпись+значение) */
+.nd .head-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(148px, 1fr)); gap: 14px 20px; margin-top: 14px; }
+.nd .head-facts__label { font: 500 10px/1 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-4); }
+.nd .head-facts__value { font-size: 14px; font-weight: 500; margin-top: 5px; }
+
+/* сводка расхождений */
+.nd .act-warn {
+  display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-radius: var(--r-lg);
+  background: var(--danger-bg); color: var(--danger-strong);
+}
+
+/* фотофиксация (4 слота) */
+.nd .photo-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.nd .photo-slot {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  height: 86px; border-radius: var(--r-lg); text-decoration: none;
+  background: var(--surface-4); border: 1.5px dashed var(--line-strong); color: var(--text-3);
+  font: 500 12px var(--font-ui);
+}
+.nd .photo-slot.is-done { background: var(--row-selected); border: 1.5px solid var(--accent); color: var(--accent-ink); }
+
+/* ---------- toast ---------- */
+
+.nd-toast {
+  position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%); z-index: 80;
+  display: flex; align-items: center; gap: 10px;
+  padding: 13px 18px; border-radius: 13px;
+  background: var(--invert); color: var(--on-invert);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .28);
+  font: 500 13px var(--font-ui);
+  animation: nd-fadeUp var(--dur-base) var(--ease-standard) both;
+}
+
+/* ============================================================
+   Табличный слой (шаблон DataTable). Порт reference/ui.css.
+   ============================================================ */
+
+.nd .table-card {
+  position: relative;
+  display: flex; flex-direction: column; min-height: 0;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--r-xl); box-shadow: var(--shadow-card); overflow: hidden;
+}
+.nd .table-scroll { flex: 0 1 auto; min-height: 0; overflow: auto; }
+/* width:100% растягивает таблицу на всю ширину карточки; min-width:max-content
+   держит горизонтальный скролл при переполнении. Чтобы слак поглощался —
+   одну колонку задавать шириной minmax(<px>,1fr) в конфиге. */
+.nd .table { display: block; min-width: max-content; width: 100%; }
+.nd .table__head {
+  display: grid; grid-template-columns: inherit;
+  position: sticky; top: 0; z-index: 3;
+  background: var(--surface); border-bottom: 1px solid var(--line-head);
+}
+.nd .table__th {
+  display: flex; align-items: center; gap: 5px; padding: 12px 10px;
+  font: 500 10px var(--font-mono); letter-spacing: .06em; text-transform: uppercase;
+  color: var(--text-4); white-space: nowrap; cursor: pointer;
+  background: none; border: 0; text-align: left;
+}
+.nd .table__th:hover { color: var(--ink); }
+.nd .table__th[aria-sort] { color: var(--ink); }
+.nd .table__sort {
+  font-size: 9px; line-height: 1;
+  transition: transform var(--dur-base) var(--ease-standard), opacity var(--dur-fast) ease;
+}
+.nd .table__th[aria-sort="descending"] .table__sort { transform: rotate(180deg); }
+.nd .table__th:not([aria-sort]) .table__sort { opacity: 0; }
+.nd .table__th:hover .table__sort { opacity: .35; }
+.nd .table__row {
+  display: grid; grid-template-columns: inherit;
+  border-bottom: 1px solid var(--line-row);
+  transition: background-color var(--dur-fast) ease;
+  animation: nd-rowIn 220ms var(--ease-standard) both;
+}
+.nd .table__row:hover { background: var(--surface-4); }
+.nd .table__row[aria-selected="true"] { background: var(--row-selected); }
+.nd .table__row[data-focus="true"] { box-shadow: inset 2px 0 0 var(--ink); }
+.nd .table__row--clickable { cursor: pointer; }
+.nd .table__row--flash { animation: nd-rowFlash 900ms ease both; }
+.nd .table__td {
+  display: flex; align-items: center; gap: 8px; padding: 14px 10px;
+  font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+  transition: padding var(--dur-base) var(--ease-inout);
+}
+/* отступ контента от краёв карточки: первая/последняя колонка не впритык к контуру */
+.nd .table__head > *:first-child,
+.nd .table__row > *:first-child,
+.nd .table__foot > *:first-child { padding-left: 18px; }
+.nd .table__head > *:last-child,
+.nd .table__row > *:last-child,
+.nd .table__foot > *:last-child { padding-right: 18px; }
+.nd .table__expand {
+  padding: 0 18px;
+  border-bottom: 1px solid var(--line-row);
+  background: var(--surface-4);
+  overflow: hidden;
+  animation: nd-expandIn var(--dur-base) var(--ease-standard) both;
+}
+.nd .table__skeleton { display: grid; grid-template-columns: inherit; border-bottom: 1px solid var(--line-row); }
+.nd .table__skeleton .table__td > i { display: block; width: 70%; }
+/* Компакт меняет только вертикальный отступ — иначе shorthand `padding`
+   (спецификичнее) затирал бы левый/правый краевой отступ первой/последней
+   колонки (18px), и данные-строки уезжали относительно шапки. */
+.nd .table[data-density="compact"] .table__td { padding-top: 9px; padding-bottom: 9px; }
+/* Уплотнённый шрифт таблицы (раздел «Отчёты») — на 1пт мельче базового */
+.nd .rpt-table .table__td { font-size: 12px; }
+.nd .rpt-table .table__td--num,
+.nd .rpt-table .table__td--mono { font-size: 11.5px; }
+.nd .rpt-table .table__th { font-size: 9.5px; }
+.nd .rpt-table .table__foot .table__td { font-size: 12px; }
+/* Раздел «Отчёты» — более широкие боковые отступы контента (32 вместо 24),
+   все стопки (виджеты/фильтры/таблица) выровнены по одной линии */
+.nd .main[data-pad="wide"] .summarystrip,
+.nd .main[data-pad="wide"] .filterbar { padding-left: 32px; padding-right: 32px; }
+
+/* Матрица «Роли» (зона × роль, чтение/запись) — грид вместо <table>,
+   чтобы не ловить глобальные table-стили из styles.css */
+.nd .roles-matrix { display: grid; min-width: max-content; width: 100%; }
+.nd .rm-h {
+  padding: 10px 12px; font: 500 10px/1.3 var(--font-mono); letter-spacing: .06em;
+  text-transform: uppercase; color: var(--text-4); background: var(--surface);
+  border-bottom: 1px solid var(--line-head); display: flex; align-items: center;
+}
+.nd .rm-group { justify-content: center; border-left: 1px solid var(--line-row); font-size: 11px; color: var(--text-2); }
+.nd .rm-sub { justify-content: center; }
+.nd .rm-sub--w { border-left: 1px solid var(--line-row); }
+.nd .rm-corner { position: sticky; left: 0; z-index: 2; }
+.nd .rm-zone {
+  padding: 11px 12px; font-size: 13px; display: flex; align-items: center;
+  border-bottom: 1px solid var(--line-row); position: sticky; left: 0; background: var(--surface); z-index: 1;
+}
+.nd .roles-matrix > .rm-row-even { background: var(--surface-4); }
+.nd .rm-cell {
+  display: flex; align-items: center; justify-content: center;
+  border-bottom: 1px solid var(--line-row); border-left: 1px solid var(--line-row);
+}
+.nd .rm-cell input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+
+/* Список «Статьи расходов» — flex-строки (перетаскивание порядка) */
+.nd .cat-row { display: flex; align-items: center; min-width: max-content; border-bottom: 1px solid var(--line-row); transition: opacity .15s; }
+.nd .cat-row > * { padding: 10px 12px; box-sizing: border-box; }
+.nd .cat-head {
+  position: sticky; top: 0; z-index: 1; background: var(--surface);
+  border-bottom: 1px solid var(--line-head);
+  font: 500 10px/1 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-4);
+}
+.nd .cat-row--drag { opacity: .4; }
+.nd .cat-row--over { outline: 2px solid var(--accent); outline-offset: -2px; }
+.nd .cat-handle { cursor: grab; color: var(--text-4); user-select: none; font-size: 16px; text-align: center; }
+.nd .cat-check { display: flex; justify-content: center; }
+.nd .cat-check input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+.nd .table__td--num { justify-content: flex-end; font-family: var(--font-mono); font-size: 12.5px; }
+.nd .table__td--mono { font-family: var(--font-mono); font-size: 12.5px; }
+.nd .table__td--actions { justify-content: flex-end; gap: 5px; padding: 9px 14px; }
+.nd .table__sticky { position: sticky; z-index: 1; background: inherit; }
+.nd .table-scroll[data-scrolled-x="true"] .table__sticky::after {
+  content: ""; position: absolute; top: 0; bottom: 0; right: -14px; width: 14px;
+  background: linear-gradient(to right, rgba(0, 0, 0, .07), transparent);
+  pointer-events: none;
+}
+[data-theme="dark"] .nd .table-scroll[data-scrolled-x="true"] .table__sticky::after {
+  background: linear-gradient(to right, rgba(0, 0, 0, .45), transparent);
+}
+.nd .table-scroll[data-scrolled-y="true"] .table__head { box-shadow: 0 6px 14px -8px rgba(0, 0, 0, .28); }
+.nd .table__foot {
+  display: grid; grid-template-columns: inherit;
+  position: sticky; bottom: 0; z-index: 3;
+  background: var(--surface-2); border-top: 1px solid var(--line-strong);
+}
+/* только вертикальный отступ — горизонтальный (вкл. краевые 18px) не трогаем */
+.nd .table__foot .table__td { padding-top: 14px; padding-bottom: 14px; font-weight: 600; }
+
+.nd .pager {
+  flex: none; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 14px 18px; margin: 0; border-top: 1px solid var(--line);
+}
+.nd .pager__btn {
+  width: 32px; height: 32px; border-radius: var(--r-sm);
+  border: 1px solid var(--line-strong); background: var(--surface);
+  color: var(--ink); font: 500 12px var(--font-mono); cursor: pointer;
+}
+.nd .pager__btn:disabled { opacity: .4; cursor: default; }
+
+.nd .bulkbar {
+  flex: none; display: flex; align-items: center; gap: 12px;
+  margin-top: 12px; padding: 12px 16px; border-radius: var(--r-lg);
+  background: var(--invert); color: var(--on-invert);
+  animation: nd-fadeUp var(--dur-base) var(--ease-standard) both;
+}
+.nd .bulkbar .btn--onDark { background: rgba(255, 255, 255, .12); color: var(--on-invert); }
+.nd .bulkbar .btn--onDark:hover { background: rgba(255, 255, 255, .2); }
+
+/* чекбокс: галочка + промежуточное состояние */
+.nd .checkbox { position: relative; }
+.nd .checkbox[aria-checked="true"]::after {
+  content: ""; position: absolute; left: 3.5px; top: .5px;
+  width: 4px; height: 8px; border: solid #0E0E0E; border-width: 0 1.7px 1.7px 0;
+  transform: rotate(42deg);
+  animation: nd-checkPop 160ms var(--ease-standard) both;
+}
+.nd .checkbox[aria-checked="mixed"] { background: var(--accent); border-color: var(--accent); }
+.nd .checkbox[aria-checked="mixed"]::after {
+  content: ""; position: absolute; left: 2.5px; top: 5.4px;
+  width: 7px; height: 0; border-top: 1.8px solid #0E0E0E;
+}
+
+/* скелет загрузки */
+.nd .skeleton {
+  height: 12px; border-radius: 6px;
+  background: linear-gradient(90deg, var(--surface-2) 25%, var(--surface-4) 50%, var(--surface-2) 75%);
+  background-size: 280px 100%;
+  animation: nd-shimmer 1200ms linear infinite;
+}
+
+/* ---------- focus ---------- */
+
+.nd :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.nd .widget--dark :focus-visible { outline-color: var(--accent); }
+.nd .table-scroll:focus-visible { outline: none; }
+
+/* ---------- keyframes (nd-prefixed) ---------- */
+
+@keyframes nd-fadeUp    { from { opacity: 0; transform: translateY(8px); }  to { opacity: 1; transform: none; } }
+@keyframes nd-fadeIn    { from { opacity: 0; }                              to { opacity: 1; } }
+@keyframes nd-slideLeft { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: none; } }
+@keyframes nd-growY     { from { transform: scaleY(0); }                    to { transform: scaleY(1); } }
+@keyframes nd-pulseDot  { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+@keyframes nd-rowIn     { from { opacity: 0; transform: translateY(4px); }  to { opacity: 1; transform: none; } }
+@keyframes nd-rowFlash  { 0% { background: var(--accent); } 100% { background: transparent; } }
+@keyframes nd-expandIn  { from { opacity: 0; max-height: 0; }               to { opacity: 1; max-height: 320px; } }
+@keyframes nd-checkPop  { from { transform: rotate(42deg) scale(.4); opacity: 0; } to { transform: rotate(42deg) scale(1); opacity: 1; } }
+@keyframes nd-shimmer   { from { background-position: -280px 0; } to { background-position: 280px 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .nd *, .nd *::before, .nd *::after,
+  .nd-overlay, .nd-modal, .nd-toast {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ============================================================
+   Helper-классы для повторяющихся раскладок (вместо inline в TSX).
+   ============================================================ */
+
+.nd .row-c   { display: flex; align-items: center; }
+.nd .row-b   { display: flex; align-items: baseline; }
+.nd .gap-6   { gap: 6px; }
+.nd .gap-8   { gap: 8px; }
+.nd .gap-9   { gap: 9px; }
+.nd .gap-10  { gap: 10px; }
+.nd .gap-12  { gap: 12px; }
+.nd .gap-14  { gap: 14px; }
+.nd .grow    { flex: 1; min-width: 0; }
+.nd .wrap    { flex-wrap: wrap; }
+
+/* легенда табло / топлива: цветной квадратик */
+.nd .swatch { flex: none; width: 9px; height: 9px; border-radius: 3px; display: block; }
+.nd .swatch--done { background: var(--swatch-mute); }
+.nd .swatch--run  { background: var(--accent); }
+.nd .swatch--next { background: var(--invert); }
+.nd .swatch--cards { background: var(--accent); }
+.nd .swatch--cash  { background: var(--invert); }
+.nd .swatch--limit { background: var(--bar); }
+
+.nd .board-legend { display: flex; align-items: center; gap: 14px; }
+.nd .board-legend > span { display: flex; align-items: center; gap: 6px; }
+
+/* KPI-лента как «bare»-контейнер */
+.nd .kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+.nd .kpi-strip .kpi { background: var(--surface); }
+
+/* график: заголовок-итог */
+.nd .metric-total { display: flex; align-items: flex-end; gap: 10px; margin-top: 8px; }
+.nd .metric-total__delta { display: flex; align-items: center; gap: 6px; padding-bottom: 6px; }
+
+/* топливо */
+.nd .fuel-body { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+.nd .fuel-legend { flex: 1; min-width: 170px; display: flex; flex-direction: column; gap: 11px; }
+.nd .fuel-legend__row { display: flex; align-items: center; gap: 9px; }
+.nd .fuel-legend__row .grow { flex: 1; }
+.nd .fuel-legend__foot {
+  margin-top: 2px; padding-top: 11px; border-top: 1px solid var(--line);
+  display: flex; justify-content: space-between;
+}
+
+/* «Денежный поток» — горизонтальный стек-бар по статьям */
+.nd .flow-bar {
+  display: flex; width: 100%; height: 16px; border-radius: 8px; overflow: hidden;
+  background: var(--surface-3); margin-bottom: 16px;
+}
+.nd .flow-bar__seg { height: 100%; min-width: 2px; transition: width .45s var(--ease-standard); }
+.nd .flow-bar__seg + .flow-bar__seg { box-shadow: inset 1px 0 0 var(--surface); }
+
+/* мини-кнопка в шапке виджета */
+.nd .btn--soft { background: var(--surface-2); padding: 5px 10px; font-size: 12px; }
+
+/* alerts бейдж-счётчик */
+.nd .alerts-badge {
+  font: 500 11px var(--font-mono); padding: 4px 8px;
+  border-radius: var(--r-xs); background: var(--accent); color: var(--on-accent);
+}
+
+/* панель рейса — вспомогательное */
+.nd-panel-note { font: 400 10.5px var(--font-mono); color: var(--text-4); }
+.nd-comments { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+
+/* ---------- фильтр-дропдаун (мультивыбор) ---------- */
+.nd-fdrop { position: relative; }
+.nd-fdrop__menu {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 40;
+  min-width: 200px; max-height: 320px; overflow: auto;
+  padding: 6px; display: flex; flex-direction: column; gap: 1px;
+  background: var(--surface); border: 1px solid var(--line-strong);
+  border-radius: var(--r-lg); box-shadow: var(--shadow-modal);
+  animation: nd-fadeUp var(--dur-fast) var(--ease-standard) both;
+}
+.nd-fdrop__item {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 8px 10px; border: 0; border-radius: var(--r-sm);
+  background: transparent; color: var(--ink); cursor: pointer; text-align: left;
+  font: 400 13px var(--font-ui);
+}
+.nd-fdrop__item:hover { background: var(--surface-3); }
+.nd-fdrop__clear {
+  align-self: flex-start; padding: 4px 8px; margin-bottom: 2px; border: 0;
+  background: transparent; color: var(--text-3); cursor: pointer;
+  font: 500 11px var(--font-mono); text-transform: uppercase; letter-spacing: .05em;
+}
+.nd-fdrop__clear:hover { color: var(--danger); }
+
+/* ---------- переключатель вкладок раздела ---------- */
+.nd .section-tabs {
+  flex: none; display: flex; align-items: center; gap: 10px;
+  padding: 14px 24px 0;
+}
+.nd .section-tabs__right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+
+/* ---------- строка фильтров ---------- */
+.nd .filterbar {
+  flex: none; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 12px 24px 0;
+}
+
+/* тумблер (напр. «только со штрафами») */
+.nd .switch {
+  display: inline-flex; align-items: center; gap: 9px;
+  padding: 7px 12px 7px 10px; border-radius: var(--r-md);
+  border: 1px solid var(--line-strong); background: var(--surface);
+  color: var(--text-2); cursor: pointer; white-space: nowrap;
+  font: 500 12.5px var(--font-ui);
+  transition: color var(--dur-fast) ease, border-color var(--dur-fast) ease;
+}
+.nd .switch:hover { border-color: var(--line-head); }
+.nd .switch[aria-pressed="true"] { color: var(--ink); }
+.nd .switch__track {
+  position: relative; flex: none; width: 30px; height: 17px; border-radius: 999px;
+  background: var(--bar-dim); transition: background-color var(--dur-base) var(--ease-inout);
+}
+.nd .switch[aria-pressed="true"] .switch__track { background: var(--accent); }
+.nd .switch__knob {
+  position: absolute; top: 2px; left: 2px; width: 13px; height: 13px; border-radius: 50%;
+  background: var(--surface); box-shadow: 0 1px 2px rgba(0, 0, 0, .25);
+  transition: transform var(--dur-base) var(--ease-standard);
+}
+.nd .switch[aria-pressed="true"] .switch__knob { transform: translateX(13px); }
+.nd .filter-date {
+  padding: 8px 10px; border-radius: var(--r-md);
+  border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink);
+  font: 400 12.5px var(--font-mono); outline: none;
+}
+.nd .filter-date:focus { border-color: var(--ink); }
+.nd .filter-field { display: flex; flex-direction: column; gap: 4px; }
+.nd .filter-field > .t-mono-label { padding-left: 2px; }
+/* метка слева от поля (для дат «С»/«По») */
+.nd .filter-field--inline { flex-direction: row; align-items: center; gap: 8px; }
+.nd .filter-field--inline > .t-mono-label { padding-left: 0; }
+
+/* ---------- переключатель вида таблица/плитки + плитки ---------- */
+.nd .viewtoggle { display: inline-flex; gap: 2px; padding: 3px; background: var(--surface-2); border-radius: var(--r-md); }
+.nd .viewtoggle__btn {
+  display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 28px;
+  border: 0; border-radius: var(--r-sm); background: transparent; color: var(--text-3); cursor: pointer;
+  transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease;
+}
+.nd .viewtoggle__btn[aria-pressed="true"] { background: var(--invert); color: var(--on-invert); }
+
+.nd .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+.nd .vcard {
+  display: flex; flex-direction: column; gap: 12px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-xl);
+  padding: 16px 17px 14px; cursor: pointer;
+  transition: border-color var(--dur-fast) ease, transform var(--dur-fast) ease;
+  animation: nd-fadeUp 240ms var(--ease-standard) both;
+}
+.nd .vcard:hover { border-color: var(--line-strong); }
+.nd .vcard:active { transform: translateY(1px); }
+.nd .vcard__head { display: flex; align-items: flex-start; gap: 12px; }
+.nd .vcard__stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 12px 0; border-top: 1px solid var(--line-row); border-bottom: 1px solid var(--line-row); }
+.nd .vcard__stat .l { font: 500 10px/1 var(--font-mono); letter-spacing: .05em; text-transform: uppercase; color: var(--text-4); }
+.nd .vcard__stat .v { font-size: 14px; font-weight: 500; margin-top: 5px; font-variant-numeric: tabular-nums; }
+.nd .vcard__foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* прогресс-бар «до ТО» (как баланс в кабинете водителя) */
+.nd .probar { height: 8px; border-radius: 4px; background: var(--bar-done); overflow: hidden; }
+.nd .probar__fill { height: 100%; border-radius: 4px; transition: width var(--dur-slow) var(--ease-standard); }
+.nd .probar-row { display: flex; justify-content: space-between; margin-top: 6px; font: 400 11px var(--font-mono); color: var(--text-3); font-variant-numeric: tabular-nums; }
+
+/* ---------- лента виджетов-сводок ---------- */
+.nd .summarystrip {
+  flex: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px; padding: 14px 24px 0;
+}
+.nd .summary {
+  background: var(--surface); border-radius: var(--r-lg); padding: 14px 16px;
+}
+.nd .summary__label { font: 500 10px var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-4); }
+.nd .summary__value { font-size: 26px; font-weight: 300; letter-spacing: -.02em; margin-top: 8px; font-variant-numeric: tabular-nums; }

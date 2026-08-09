@@ -208,6 +208,8 @@ export default function Vehicles({ tabsNav }: { tabsNav?: ReactNode } = {}) {
   const [activeSessions, setActiveSessions] = useState<Map<number, ActiveSession>>(new Map());
   const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
 
+  const [viewTruck, setViewTruck] = useState<Truck | null>(null);
+
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<TruckFormState>(EMPTY_FORM);
@@ -438,7 +440,7 @@ export default function Vehicles({ tabsNav }: { tabsNav?: ReactNode } = {}) {
                       : servicePct >= 70 ? "var(--warn-ink)"
                       : undefined;
                     return (
-                    <tr key={t.id} onClick={() => openEdit(t)} style={{ cursor: "pointer" }}>
+                    <tr key={t.id} onClick={() => setViewTruck(t)} style={{ cursor: "pointer" }}>
                       <td>{displayName(t)}</td>
                       <td>{t.plate || "—"}</td>
                       <td>{t.sts_number || "—"}</td>
@@ -508,7 +510,7 @@ export default function Vehicles({ tabsNav }: { tabsNav?: ReactNode } = {}) {
               v != null ? `${Math.round(v).toLocaleString("ru-RU")} км` : "—";
 
             return (
-            <div key={t.id} className="vcard" onClick={() => openEdit(t)} style={{ cursor: "pointer" }}>
+            <div key={t.id} className="vcard" onClick={() => setViewTruck(t)} style={{ cursor: "pointer" }}>
               <div className="vcard-top">
                 <span className="vthumb">
                   <Icon name="truck" size={28} />
@@ -589,6 +591,153 @@ export default function Vehicles({ tabsNav }: { tabsNav?: ReactNode } = {}) {
 
       {selectedSessionId !== null && (
         <VehSessionDetailModal sessionId={selectedSessionId} onClose={() => setSelectedSessionId(null)} />
+      )}
+
+      {/* ── Вью-модал автомобиля ── */}
+      {viewTruck && (
+        <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setViewTruck(null); }}>
+          <div style={{
+            background: "var(--surface)", borderRadius: 20, width: 520,
+            maxWidth: "94vw", maxHeight: "90vh", overflowY: "auto", padding: 0,
+            boxShadow: "var(--shadow-modal)",
+          }}>
+            {/* Заголовок */}
+            <div style={{
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+              padding: "20px 24px 0",
+            }}>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "var(--ink)" }}>
+                Информация об автомобиле
+              </h2>
+              <button
+                type="button"
+                onClick={() => setViewTruck(null)}
+                style={{
+                  background: "var(--surface-2)", border: "none", borderRadius: 10,
+                  width: 34, height: 34, display: "grid", placeItems: "center",
+                  cursor: "pointer", fontSize: 18, color: "var(--ink)",
+                }}
+              >×</button>
+            </div>
+
+            {/* Карточка авто */}
+            <div style={{ margin: "16px 24px", background: "var(--surface-2)", borderRadius: 14, padding: "14px 16px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
+                <div style={{
+                  width: 44, height: 44, borderRadius: 10, background: "var(--surface)",
+                  border: "1px solid var(--line)", display: "grid", placeItems: "center", flexShrink: 0,
+                }}>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>
+                  </svg>
+                </div>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 18, color: "var(--ink)", fontFamily: "var(--font-mono)", letterSpacing: "0.01em" }}>
+                    {viewTruck.plate || "—"}
+                  </div>
+                  <div style={{ fontSize: 13, color: "var(--text-2)", marginTop: 2 }}>
+                    {[viewTruck.brand, viewTruck.year].filter(Boolean).join(" · ") || "—"}
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 24, fontSize: 13 }}>
+                {viewTruck.body_type && (
+                  <div>
+                    <span style={{ color: "var(--text-3)" }}>Кузов: </span>
+                    <span style={{ fontWeight: 600, color: "var(--ink)" }}>{viewTruck.body_type}</span>
+                  </div>
+                )}
+                {viewTruck.vin && (
+                  <div>
+                    <span style={{ color: "var(--text-3)" }}>VIN: </span>
+                    <span style={{ fontWeight: 600, color: "var(--ink)", fontFamily: "var(--font-mono)", fontSize: 12 }}>{viewTruck.vin}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Документы */}
+            <div style={{ padding: "0 24px 24px" }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 10 }}>
+                Документы
+              </div>
+              {[
+                { key: "sts", label: "СТС", number: viewTruck.sts_number, date: viewTruck.sts_date, scan: viewTruck.sts_scan },
+                { key: "osago", label: "ОСАГО", number: viewTruck.osago_number, date: viewTruck.osago_date, scan: viewTruck.osago_scan },
+                { key: "kasko", label: "КАСКО", number: viewTruck.kasko_number, date: viewTruck.kasko_date, scan: viewTruck.kasko_scan },
+                { key: "tech", label: "КАРТА ТЕХОСМОТРА", number: viewTruck.tech_inspection_number, date: viewTruck.tech_inspection_date, scan: viewTruck.tech_inspection_scan },
+                { key: "msk", label: "ПРОПУСК МСК", number: "", date: viewTruck.moscow_pass_date, scan: "" },
+              ].map(doc => (
+                <div key={doc.key} style={{
+                  display: "flex", alignItems: "center", gap: 12,
+                  background: "var(--surface)", border: "1px solid var(--line)",
+                  borderRadius: 12, padding: "12px 16px", marginBottom: 8,
+                }}>
+                  <div style={{
+                    width: 36, height: 36, borderRadius: 8, background: "var(--surface-2)",
+                    display: "grid", placeItems: "center", flexShrink: 0,
+                  }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+                    </svg>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 2 }}>
+                      {doc.label}
+                    </div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)" }}>
+                      {doc.number || "Номер не указан"}
+                    </div>
+                    {doc.date && (
+                      <div style={{ fontSize: 12, color: isOverdue(doc.date) ? "var(--danger)" : "var(--text-2)", marginTop: 1 }}>
+                        до {fmtDate(doc.date)}
+                      </div>
+                    )}
+                  </div>
+                  {doc.scan ? (
+                    <a
+                      href={fileUrl(`/truck-scans/${doc.scan}`)}
+                      download
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={() => logDownload(doc.scan, "documents")}
+                      style={{
+                        background: "var(--invert)", color: "var(--on-invert)",
+                        border: "none", borderRadius: 10, padding: "8px 16px",
+                        fontSize: 13, fontWeight: 600, cursor: "pointer",
+                        textDecoration: "none", flexShrink: 0, fontFamily: "var(--font-ui)",
+                      }}
+                    >
+                      Скачать
+                    </a>
+                  ) : (
+                    <span style={{
+                      background: "var(--surface-2)", color: "var(--text-3)",
+                      borderRadius: 10, padding: "8px 16px",
+                      fontSize: 13, fontWeight: 600, flexShrink: 0,
+                    }}>
+                      Нет файла
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Кнопки */}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, padding: "0 24px 20px" }}>
+              <button
+                type="button"
+                className="pill-btn"
+                onClick={() => setViewTruck(null)}
+              >Закрыть</button>
+              <button
+                type="button"
+                className="pill-btn solid"
+                onClick={() => { const t = viewTruck; setViewTruck(null); openEdit(t); }}
+              >Редактировать</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {modalOpen && (
@@ -933,7 +1082,7 @@ function VehSessionDetailModal({ sessionId, onClose }: { sessionId: number; onCl
 // DocScanBlock — строка «Номер · Дата · Прикрепить скан» для одного документа
 // ──────────────────────────────────────────────────────────────────────────────
 function DocScanBlock({
-  label, docType, numberValue, dateValue, scanFilename,
+  label, numberValue, dateValue, scanFilename,
   uploading, canUpload,
   onNumberChange, onDateChange, onFileChange, scanRef,
 }: {

@@ -1,0 +1,92 @@
+/* =================================================================
+   Transport CRM — Reset & Base
+   ================================================================= */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  height: 100%;
+  scroll-behavior: smooth;
+}
+
+body {
+  height: 100%;
+  background: var(--bg);
+  overflow-x: hidden;
+}
+
+#root {
+  height: 100%;
+}
+
+img, svg, video {
+  display: block;
+  max-width: 100%;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  background: none;
+  font-family: inherit;
+  color: inherit;
+}
+
+a {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+[data-theme="dark"] a {
+  color: var(--ink);
+}
+
+[data-theme="dark"] a:hover {
+  color: var(--accent);
+}
+
+input, textarea, select {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  outline: none;
+}
+
+/* ── Фокус ── */
+:focus-visible {
+  outline: 2px solid var(--invert);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+
+/* ── Скроллбар (light) ── */
+::-webkit-scrollbar       { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, .15);
+  border-radius: 4px;
+  border: 2px solid var(--bg);
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(0, 0, 0, .25); }
+
+/* ── Скроллбар (dark) ── */
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, .18);
+  border-color: #131412;
+}
+
+/* ── prefers-reduced-motion ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

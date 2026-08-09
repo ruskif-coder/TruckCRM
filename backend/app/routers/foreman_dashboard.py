@@ -10,9 +10,11 @@
 
 Доступ: admin и foreman (require_role("foreman")).
 """
+import os
+import uuid
 from datetime import date, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
 from sqlmodel import Session, select
 
 from .. import models
@@ -20,6 +22,26 @@ from ..auth import get_current_user, require_role
 from ..database import get_session
 
 router = APIRouter(prefix="/api/foreman-dashboard", tags=["foreman-dashboard"])
+
+PHOTOS_DIR = os.environ.get("PHOTOS_DIR", "./photos")
+
+
+def _compress_photo(path: str) -> None:
+    """Сжать фото на месте: не более 1200px по длинной стороне, JPEG 80%.
+    Копия хелпера из vehicle_inspections.py — тот же формат хранения фото."""
+    try:
+        from PIL import Image  # type: ignore
+        img = Image.open(path)
+        if img.mode in ("RGBA", "P", "LA"):
+            img = img.convert("RGB")
+        w, h = img.size
+        max_px = 1200
+        if max(w, h) > max_px:
+            ratio = max_px / max(w, h)
+            img = img.resize((int(w * ratio), int(h * ratio)), Image.LANCZOS)
+        img.save(path, "JPEG", quality=80, optimize=True)
+    except Exception:
+        pass
 
 _OPEN_STATUSES = {"создана", "новая", "в работе"}
 _PENDING_COMP = "на рассмотрении"
@@ -187,3 +209,85 @@ def foreman_drivers(
         })
 
     return result
+
+
+# ─── Личные расходы бригадира (own-scoped) ─────────────────────────────────────
+# Виджет «Мои расходы» на дашборде бригадира работает по токену (created_by_user_id),
+# а НЕ через конфигурируемую зону "expenses". Так виджет не зависит от того, дал ли
+# админ бригадиру доступ к общему реестру расходов (как /api/driver-dashboard/expense
+# у водителя). Возврат/создание — только собственные записи CashFlowEntry.
+
+@router.get("/my-expenses")
+def foreman_my_expenses(
+    session: Session = Depends(get_session),
+    user: models.User = Depends(_require_foreman),
+):
+    """Собственные расходы бригадира за последние 60 дней (expense > 0)."""
+    since = (date.today() - timedelta(days=60)).isoformat()
+    rows = session.exec(
+        select(models.CashFlowEntry).where(
+            models.CashFlowEntry.created_by_user_id == user.id,
+            models.CashFlowEntry.expense > 0,
+            models.CashFlowEntry.date >= since,
+        )
+    ).all()
+    rows.sort(key=lambda e: str(e.date), reverse=True)
+    return [
+        {
+            "id":                  e.id,
+            "date":                str(e.date),
+            "status":              e.status,
+            "expense":             e.expense,
+            "income":              e.income,
+            "bank":                e.bank,
+            "category":            e.category,
+            "purpose":             e.purpose,
+            "truck_id":            e.truck_id,
+            "created_by_user_id":  e.created_by_user_id,
+            "photo_paths":         e.photo_paths,
+        }
+        for e in rows
+    ]
+
+
+@router.post("/expense-photo")
+async def foreman_upload_expense_photo(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    user: models.User = Depends(_require_foreman),
+):
+    """Загрузить фото к расходу бригадира. Возвращает { filename }.
+    Формат хранения — как у приёмки авто (PHOTOS_DIR, /photos/<uuid>)."""
+    os.makedirs(PHOTOS_DIR, exist_ok=True)
+    raw_name = file.filename or "photo"
+    ext = os.path.splitext(raw_name)[-1].lower()
+    if ext not in (".jpg", ".jpeg", ".png", ".heic", ".webp"):
+        ext = ".jpg"
+    filename = f"{uuid.uuid4().hex}{ext}"
+    path = os.path.join(PHOTOS_DIR, filename)
+    content = await file.read()
+    with open(path, "wb") as f:
+        f.write(content)
+    background_tasks.add_task(_compress_photo, path)
+    return {"filename": filename}
+
+
+@router.post("/expense", status_code=201)
+def foreman_add_expense(
+    payload: models.CashFlowEntryCreate,
+    session: Session = Depends(get_session),
+    user: models.User = Depends(_require_foreman),
+):
+    """Быстрый ввод собственного расхода бригадиром. created_by_user_id берётся
+    из токена — запись попадает в общий реестр расходов (страница «Расходы») и
+    в личный виджет «Мои расходы». Доступ по require_role(foreman), без зоны
+    "expenses" (та управляет доступом к общему реестру, здесь — только своя запись).
+    """
+    data = payload.model_dump()
+    data["created_by_user_id"] = user.id
+    data["income"] = 0
+    entry = models.CashFlowEntry(**data)
+    session.add(entry)
+    session.commit()
+    session.refresh(entry)
+    return {"id": entry.id, "ok": True}
