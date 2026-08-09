@@ -15,6 +15,7 @@ import type { Column } from "./NdDataTable";
 import { NdField, NdSearch } from "./shared";
 import NdTxModal from "./NdTxModal";
 import type { TxKind } from "./NdTxModal";
+import { useAuth } from "../../auth/AuthContext";
 import "./newdash.css";
 
 type Driver = {
@@ -74,20 +75,6 @@ function lastReportingWeek() {
 
 const fullName = (d: Driver) => [d.last_name, d.first_name, d.middle_name].filter(Boolean).join(" ") || d.name || "—";
 
-// Генератор пароля 16 символов (без визуально-неоднозначных)
-function genPassword(len = 16): string {
-  const chars = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  // rejection sampling — без modulo-смещения: отбрасываем «хвост» диапазона
-  const max = Math.floor(0x100000000 / chars.length) * chars.length;
-  const buf = new Uint32Array(1);
-  let s = "";
-  while (s.length < len) {
-    crypto.getRandomValues(buf);
-    if (buf[0] < max) s += chars[buf[0] % chars.length];
-  }
-  return s;
-}
-
 type FS = {
   name: string; phone: string; notes: string; mobile_login: string; mobile_password: string;
   last_name: string; first_name: string; middle_name: string; birth_date: string; birth_place: string; email: string;
@@ -132,6 +119,13 @@ export default function NewDashDrivers() {
   const [rateMap, setRateMap] = useState<Map<number, DriverRate[]>>(new Map());
   const [trips, setTrips] = useState<Trip[]>([]);
   const [mileage, setMileage] = useState<MileageEntry[]>([]);
+  // Реальный логин водителя = username его User-учётки. Тянем карту
+  // driver_id -> username, чтобы показать в поле «Логин» действующий логин
+  // (а не мёртвое Driver.mobile_login). Список пользователей — admin-only,
+  // поэтому у не-админа карта пустая (управление учётками им и так закрыто).
+  const [loginMap, setLoginMap] = useState<Map<number, string>>(new Map());
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState("");
@@ -149,13 +143,21 @@ export default function NewDashDrivers() {
   const [ledgerFor, setLedgerFor] = useState<Driver | null>(null);
   const [ledger, setLedger] = useState<LedgerEntry[] | null>(null);
   const [txModal, setTxModal] = useState<TxKind | null>(null);
-  async function resetPassword(d: Driver) {
-    const pwd = genPassword(16);
+  // Пароль водителя = пароль его User-учётки. Сброс/создание — только через
+  // /create-account (сервер генерит пароль и пишет User.password_hash). Запись
+  // в Driver.mobile_password для входа НЕ используется (мёртвое поле).
+  async function resetPassword(d: Driver, login?: string) {
+    // login — желаемый логин из поля «Логин». Пусто -> сервер берёт телефон
+    // (при создании) или оставляет текущий (при сбросе).
+    const wanted = (login || "").trim();
     try {
-      await api.put(`/api/drivers/${d.id}`, { ...toPayload(toForm(d)), mobile_password: pwd });
-      navigator.clipboard?.writeText(pwd);
-      window.alert(`Новый пароль водителя ${fullName(d)}:\n${pwd}\n\n(скопирован в буфер обмена — передайте водителю)`);
-    } catch { window.alert("Не удалось сбросить пароль"); }
+      const r = await api.post<{ username: string; password: string; reset: boolean }>(
+        `/api/drivers/${d.id}/create-account`, wanted ? { login: wanted } : {});
+      try { await navigator.clipboard?.writeText(r.password); } catch { /* clipboard недоступен */ }
+      setLoginMap(m => { const n = new Map(m); n.set(d.id, r.username); return n; });
+      setForm(f => ({ ...f, mobile_login: r.username }));
+      window.alert(`Учётка водителя ${fullName(d)}\nЛогин: ${r.username}\nПароль: ${r.password}\n\n${r.reset ? "Пароль сброшен" : "Аккаунт создан"}. Пароль скопирован в буфер — передайте водителю (повторно не отобразится).`);
+    } catch (e) { window.alert(e instanceof ApiError ? e.message : "Не удалось сбросить пароль"); }
   }
   function exportLedger(d: Driver, L: LedgerEntry[]) {
     // экранируем от CSV formula-injection: ячейку, начинающуюся с = + - @, префиксуем '
@@ -218,6 +220,11 @@ export default function NewDashDrivers() {
     api.get<Trip[]>("/api/trips/").then(setTrips).catch(() => {});
     api.get<MileageEntry[]>("/api/mileage-logs/").then(setMileage).catch(() => {});
     api.get<Carrier[]>("/api/carriers/").then(setCarriers).catch(() => {});
+    if (isAdmin) {
+      api.get<{ id: number; username: string; driver_id: number | null }[]>("/api/users/")
+        .then(us => setLoginMap(new Map(us.filter(u => u.driver_id != null).map(u => [u.driver_id as number, u.username]))))
+        .catch(() => {});
+    }
     loadRateMap();
   }
   useEffect(() => { loadAll(); }, []);
@@ -252,7 +259,11 @@ export default function NewDashDrivers() {
 
   function openCreate() { setForm(EMPTY); setFormError(null); setRates([]); setEditId(0); }
   function openEdit(d: Driver) {
-    setForm(toForm(d)); setFormError(null); setEditId(d.id);
+    // В поле «Логин» показываем действующий логин учётки (если создана),
+    // иначе — легаси-значение из карточки. Это же значение уйдёт в
+    // /create-account как желаемый username.
+    setForm({ ...toForm(d), mobile_login: loginMap.get(d.id) ?? (d.mobile_login || "") });
+    setFormError(null); setEditId(d.id);
     setRates([]); setRCarrier(""); setRType("percentOfNet"); setRValue("");
     loadRates(d.id);
   }
@@ -397,16 +408,19 @@ export default function NewDashDrivers() {
               <div className="field"><span className="field__label">Мобильное приложение</span>
                 <button type="button" className="switch" aria-pressed={form.mobile_app_enabled} onClick={() => setF("mobile_app_enabled", !form.mobile_app_enabled)} style={{ alignSelf: "flex-start" }}><span className="switch__track"><span className="switch__knob" /></span>{form.mobile_app_enabled ? "Включено" : "Выключено"}</button>
               </div>
-              <NdField label="Логин" v={form.mobile_login} on={v => setF("mobile_login", v)} />
+              <NdField label="Логин" v={form.mobile_login} on={v => setF("mobile_login", v)} placeholder="по умолчанию — телефон" />
               <NdField label="Телефон" v={form.phone} on={v => setF("phone", v)} />
               <div className="field form-grid__field--wide">
-                <span className="field__label">Пароль мобильного приложения</span>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <input className="field__input" value={form.mobile_password} readOnly placeholder="не задан" style={{ flex: 1, fontFamily: "var(--font-mono)" }} />
-                  <button type="button" className="btn btn--ghost" onClick={() => setF("mobile_password", genPassword(16))}>Сбросить пароль</button>
-                  <button type="button" className="btn" disabled={!form.mobile_password} onClick={() => { if (form.mobile_password) navigator.clipboard?.writeText(form.mobile_password); }} style={{ background: "var(--surface-2)" }}>Копировать</button>
-                </div>
-                <span className="t-caption muted" style={{ marginTop: 4 }}>16 символов. Сохранится при нажатии «Сохранить». Передайте водителю — потом не отображается открытым.</span>
+                <span className="field__label">Учётная запись водителя</span>
+                <button type="button" className="btn btn--ghost" style={{ alignSelf: "flex-start" }} disabled={!editId}
+                  onClick={() => { const d = drivers.find(x => x.id === editId); if (d) resetPassword(d, form.mobile_login); }}>
+                  Создать аккаунт / сбросить пароль
+                </button>
+                <span className="t-caption muted" style={{ marginTop: 4 }}>
+                  {editId
+                    ? "Логин берётся из поля «Логин» (пусто — телефон водителя); применяется этой кнопкой — она же создаёт учётку, меняет логин и сбрасывает пароль. Пароль сервер сгенерирует и покажет один раз (нужны заполненные телефон и e-mail; сохраните карточку перед сбросом)."
+                    : "Сначала сохраните водителя, затем создайте аккаунт."}
+                </span>
               </div>
             </div>
           </section>

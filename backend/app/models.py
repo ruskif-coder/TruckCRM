@@ -691,6 +691,20 @@ class SettingsUpdate(SQLModel):
     default_maintenance_interval_km: Optional[int] = None
 
 
+# ---------------- UserPref (per-user key→JSON store) ----------------
+# Персональные настройки интерфейса за пользователем (напр. раскладка стола
+# /newdash: расположение/размеры/видимость виджетов). value — произвольный
+# JSON в виде строки. Уникальна пара (user_id, key) — на пользователя один
+# ключ. Заменяет localStorage-хранение, которое слетало при чистом кеше.
+class UserPref(SQLModel, table=True):
+    __table_args__ = (UniqueConstraint("user_id", "key", name="uq_userpref_user_key"),)
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    key: str = Field(index=True)
+    value: str = ""  # JSON-строка
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 # ---------------- User (auth) ----------------
 class UserBase(SQLModel):
     username: str

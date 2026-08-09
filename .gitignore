@@ -31,3 +31,10 @@ frontend/tsconfig.tsbuildinfo
 crm.bat
 deploy.bat
 start_docker.bat
+
+# Markdown-документация в git НЕ хранится — кроме общего описания проекта
+# (docs/project-state.md) и инструкции по деплою (README.md). Всё остальное
+# (рабочие заметки, чеклисты, dev-гайды, планы) — локальное.
+*.md
+!README.md
+!docs/project-state.md

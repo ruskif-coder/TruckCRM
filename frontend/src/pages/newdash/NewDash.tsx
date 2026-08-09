@@ -236,20 +236,27 @@ const hhmm = (h: number) => {
   return String(Math.floor(t)).padStart(2, "0") + ":" + String(Math.round((t % 1) * 60)).padStart(2, "0");
 };
 
-function loadLayout(): Layout {
-  try {
-    const saved = JSON.parse(localStorage.getItem(LS_KEY) || "null");
-    if (saved && saved.order && saved.order.length === DEFAULT_LAYOUT.order.length) {
-      // глубокий мёрж — новые ключи/дефолты (vis/w/h) не теряются
-      return {
-        ...DEFAULT_LAYOUT, ...saved,
-        vis: { ...DEFAULT_LAYOUT.vis, ...saved.vis },
-        w: { ...DEFAULT_LAYOUT.w, ...saved.w },
-        h: { ...DEFAULT_LAYOUT.h, ...saved.h },
-      };
-    }
-  } catch { /* ignore */ }
+const PREF_KEY = "desk.layout";  // ключ на бэкенде: GET/PUT /api/user-prefs/desk.layout
+
+// Глубокий мёрж сохранённой раскладки с дефолтом (новые ключи/дефолты vis/w/h
+// не теряются). null/битое/несовпадающий order → дефолт. Общий для localStorage
+// и серверного значения (/api/user-prefs).
+function mergeLayout(saved: unknown): Layout {
+  const s = saved as Partial<Layout> | null;
+  if (s && s.order && s.order.length === DEFAULT_LAYOUT.order.length) {
+    return {
+      ...DEFAULT_LAYOUT, ...s,
+      vis: { ...DEFAULT_LAYOUT.vis, ...s.vis },
+      w: { ...DEFAULT_LAYOUT.w, ...s.w },
+      h: { ...DEFAULT_LAYOUT.h, ...s.h },
+    };
+  }
   return DEFAULT_LAYOUT;
+}
+
+function loadLayout(): Layout {
+  try { return mergeLayout(JSON.parse(localStorage.getItem(LS_KEY) || "null")); }
+  catch { return DEFAULT_LAYOUT; }
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -270,9 +277,30 @@ export default function NewDash() {
   const [L, setL] = useState<Layout>(loadLayout);
   const [dragging, setDragging] = useState<WKey | null>(null);
   const Lref = useRef(L);
+  // Раскладка стола сохраняется ЗА ПОЛЬЗОВАТЕЛЕМ на бэкенде (/api/user-prefs),
+  // а не только в localStorage — переживает чистку кеша и смену устройства.
+  // localStorage остаётся мгновенным кешем (рендер до ответа сервера).
+  const prefLoaded = useRef(false);   // серверное значение уже применено
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 1) при входе тянем серверную раскладку и, если есть, применяем поверх кеша.
+  useEffect(() => {
+    let alive = true;
+    api.get<{ value: unknown }>(`/api/user-prefs/${PREF_KEY}`)
+      .then(r => { if (alive && r.value) setL(mergeLayout(r.value)); })
+      .catch(() => { /* нет доступа/сети → остаёмся на localStorage-кеше */ })
+      .finally(() => { if (alive) prefLoaded.current = true; });
+    return () => { alive = false; };
+  }, []);
+  // 2) на изменение — мгновенно в localStorage + дебаунс-сохранение на сервер
+  //    (только после первичной загрузки, чтобы не затереть серверное дефолтом).
   useEffect(() => {
     Lref.current = L;
     try { localStorage.setItem(LS_KEY, JSON.stringify(L)); } catch { /* ignore */ }
+    if (!prefLoaded.current) return;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      api.put(`/api/user-prefs/${PREF_KEY}`, { value: L }).catch(() => { /* сеть/доступ — не критично */ });
+    }, 600);
   }, [L]);
 
   // панель рейса

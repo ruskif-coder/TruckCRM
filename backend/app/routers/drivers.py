@@ -13,6 +13,7 @@ import secrets
 import string
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlmodel import Session, select
 
 from .. import audit, models
@@ -148,9 +149,17 @@ def delete_driver(
     return None
 
 
+class _AccountBody(BaseModel):
+    # Необязательный явный логин учётки. Пусто/не передан - логин = цифры
+    # телефона (историческое поведение). Если задан - становится username
+    # User-учётки (при создании) или переименовывает её (при сбросе).
+    login: str | None = None
+
+
 @router.post("/{driver_id}/create-account", dependencies=_account_write)
 def create_driver_account(
     driver_id: int,
+    body: _AccountBody | None = None,
     session: Session = Depends(get_session),
     actor: models.User = Depends(get_current_user),
 ):
@@ -176,10 +185,26 @@ def create_driver_account(
             400, "У водителя не указан корректный email — заполните карточку перед созданием аккаунта"
         )
 
+    # Явный логин из карточки (поле «Логин»). Пусто -> телефон (как раньше).
+    custom_login = (body.login if body else None) or ""
+    custom_login = custom_login.strip()
+    if custom_login and len(custom_login) < 3:
+        raise HTTPException(400, "Логин слишком короткий (минимум 3 символа)")
+
+    def _login_taken(name: str, exclude_id: int | None = None) -> bool:
+        q = select(models.User).where(models.User.username == name)
+        u = session.exec(q).first()
+        return bool(u and u.id != exclude_id)
+
     existing = session.exec(select(models.User).where(models.User.driver_id == driver_id)).first()
     password = _generate_password()
 
     if existing:
+        # Переименование логина, если поле «Логин» задано и отличается.
+        if custom_login and custom_login != existing.username:
+            if _login_taken(custom_login, exclude_id=existing.id):
+                raise HTTPException(400, f"Логин «{custom_login}» уже занят")
+            existing.username = custom_login
         existing.password_hash = hash_password(password)
         existing.is_active = True
         session.add(existing)
@@ -194,15 +219,21 @@ def create_driver_account(
         )
         return {"username": existing.username, "password": password, "reset": True}
 
-    # Логин по умолчанию - цифры телефона; на случай редкого совпадения с
-    # чужим логином (учётка создана вручную на странице Пользователи под
-    # тем же телефоном, но без привязки driver_id) - добираем суффикс,
-    # не 400, чтобы кнопка не блокировалась без явной причины для админа.
-    username = phone_digits
-    suffix = 1
-    while session.exec(select(models.User).where(models.User.username == username)).first():
-        suffix += 1
-        username = f"{phone_digits}_{suffix}"
+    if custom_login:
+        # Явно заданный логин: занят -> 400 (не подменяем выбор админа суффиксом).
+        if _login_taken(custom_login):
+            raise HTTPException(400, f"Логин «{custom_login}» уже занят")
+        username = custom_login
+    else:
+        # Логин по умолчанию - цифры телефона; на случай редкого совпадения с
+        # чужим логином (учётка создана вручную на странице Пользователи под
+        # тем же телефоном, но без привязки driver_id) - добираем суффикс,
+        # не 400, чтобы кнопка не блокировалась без явной причины для админа.
+        username = phone_digits
+        suffix = 1
+        while session.exec(select(models.User).where(models.User.username == username)).first():
+            suffix += 1
+            username = f"{phone_digits}_{suffix}"
 
     user = models.User(
         username=username,

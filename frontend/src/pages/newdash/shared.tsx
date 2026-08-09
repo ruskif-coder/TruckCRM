@@ -20,13 +20,13 @@ export function NdSearch({ value, onChange, placeholder, width = 260 }: {
 }
 
 // ── Поле формы (label + input) — был компонент F/Field в 4 файлах ──
-export function NdField({ label, v, on, type, wide }: {
-  label: string; v: string; on: (v: string) => void; type?: string; wide?: boolean;
+export function NdField({ label, v, on, type, wide, placeholder }: {
+  label: string; v: string; on: (v: string) => void; type?: string; wide?: boolean; placeholder?: string;
 }) {
   return (
     <div className={"field" + (wide ? " form-grid__field--wide" : "")}>
       <span className="field__label">{label}</span>
-      <input type={type || "text"} className="field__input" value={v} onChange={e => on(e.target.value)} />
+      <input type={type || "text"} className="field__input" value={v} placeholder={placeholder} onChange={e => on(e.target.value)} />
     </div>
   );
 }

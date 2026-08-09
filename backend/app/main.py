@@ -21,6 +21,7 @@ from .routers import auth as auth_router
 from .routers import cash_flow as cash_flow_router
 from .routers import compensation_requests as compensation_requests_router
 from .routers import dashboard, settings as settings_router
+from .routers import user_prefs as user_prefs_router
 from .routers import driver_dashboard as driver_dashboard_router
 from .routers import foreman_dashboard as foreman_dashboard_router
 from .routers import driver_rates as driver_rates_router
@@ -204,6 +205,9 @@ app.include_router(counterparties_router.router, dependencies=protected)
 # Баланс перевозчиков (2026-07-12): финансовая сводка, только для staff.
 # Роутер не был подключён при создании — добавлен 2026-07-13 (аудит-фикс).
 app.include_router(carrier_balance_router.router, dependencies=protected)
+# Персональные настройки интерфейса (2026-08-09): раскладка рабочего стола
+# /newdash и т.п. за пользователем. Auth-only, каждый пишет только своё.
+app.include_router(user_prefs_router.router, dependencies=protected)
 
 # Статические файлы фото приёмки: /photos/<filename>
 # PHOTOS_DIR задаётся env (docker-compose: /photos → ./data/photos на хосте).
