@@ -81,7 +81,7 @@ const NAV: Item[] = [
 export default function NdMenu({ active }: { active: NavKey }) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [pinned, setPinned] = useState(false);
   const [hover, setHover] = useState(false);
@@ -187,6 +187,11 @@ export default function NdMenu({ active }: { active: NavKey }) {
         >
           <span className="menu__icon"><svg {...svgProps}><path d="M7 2.5h4l-.7 4.2 2.7 2.4H5l2.7-2.4z" /><path d="M9 9.1v6.4" /></svg></span>
           <span className="menu__label">{pinned ? "Открепить меню" : "Закрепить меню"}</span>
+        </button>
+
+        <button className="menu__item" title="Выйти" onClick={() => { logout(); navigate("/login", { replace: true }); }}>
+          <span className="menu__icon"><svg {...svgProps}><path d="M11.5 6V4.5A1.5 1.5 0 0 0 10 3H4.5A1.5 1.5 0 0 0 3 4.5v9A1.5 1.5 0 0 0 4.5 15H10a1.5 1.5 0 0 0 1.5-1.5V12" /><path d="M7.5 9h8" /><path d="M13.5 6.5 16 9l-2.5 2.5" /></svg></span>
+          <span className="menu__label">Выйти</span>
         </button>
 
         <div className="menu__user">
