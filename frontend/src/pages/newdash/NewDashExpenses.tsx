@@ -35,6 +35,7 @@ const statusTone = (s: string) => s === "ОПЛАЧЕНО" ? "ok" : s === "ПЛ�
 const periodFromDate = (d: string) => { const [y, m] = (d || "").split("-"); return y && m ? `${m}-${y}` : ""; };
 
 type FS = { date: string; status: string; income: string; expense: string; bank: string; vat_pct: string; truck_id: number | ""; driver_id: number | ""; category: string; counterparty: string; purpose: string };
+type Counterparty = { id: number; name: string; inn: string; vat_rate: number };
 const emptyForm = (): FS => ({ date: isoDate(new Date()), status: STATUSES[0], income: "", expense: "", bank: BANKS[0], vat_pct: "0", truck_id: "", driver_id: "", category: CATEGORIES[0], counterparty: "", purpose: "" });
 const toForm = (e: Entry): FS => ({ date: e.date || "", status: e.status || STATUSES[0], income: e.income ? String(e.income) : "", expense: e.expense ? String(e.expense) : "", bank: e.bank || "", vat_pct: e.vat_pct != null ? String(e.vat_pct) : "0", truck_id: e.truck_id ?? "", driver_id: e.driver_id ?? "", category: e.category || "", counterparty: e.counterparty || "", purpose: e.purpose || "" });
 const toPayload = (f: FS) => ({ date: f.date, status: f.status, income: Number(f.income) || 0, expense: Number(f.expense) || 0, bank: f.bank, period: periodFromDate(f.date), vat_pct: Number(f.vat_pct) || 0, truck_id: f.truck_id || null, driver_id: f.driver_id || null, category: f.category, counterparty: f.counterparty, purpose: f.purpose });
@@ -43,6 +44,7 @@ export default function NewDashExpenses() {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [trucks, setTrucks] = useState<Truck[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [counterparties, setCounterparties] = useState<Counterparty[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState("");
@@ -72,6 +74,7 @@ export default function NewDashExpenses() {
     api.get<Entry[]>("/api/expenses/").then(e => { setEntries(e); setError(null); }).catch(e => setError(e instanceof ApiError ? e.message : "Ошибка загрузки")).finally(() => setLoading(false));
     api.get<Truck[]>("/api/trucks/").then(setTrucks).catch(() => {});
     api.get<Driver[]>("/api/drivers/").then(setDrivers).catch(() => {});
+    api.get<Counterparty[]>("/api/counterparties/").then(setCounterparties).catch(() => {});
   }
   useEffect(() => { loadAll(); }, []);
 
@@ -189,7 +192,10 @@ export default function NewDashExpenses() {
               <Sel label="Статус" v={form.status} on={v => setF("status", v)} opts={STATUSES} />
               <Sel label="Статья" v={form.category} on={v => setF("category", v)} opts={CATEGORIES} />
               <Sel label="Банк" v={form.bank} on={v => setF("bank", v)} opts={BANKS} />
-              <Sel label="Контрагент" v={form.counterparty} on={v => setF("counterparty", v)} />
+              <CpCombobox list={counterparties} value={form.counterparty}
+                onChange={v => setF("counterparty", v)}
+                onVat={v => setF("vat_pct", v)}
+                onCreated={cp => setCounterparties(prev => [...prev, cp])} />
               <Sel label="Назначение" wide v={form.purpose} on={v => setF("purpose", v)} />
               <div className="field"><span className="field__label">Машина</span><select className="field__input" value={form.truck_id} onChange={e => setF("truck_id", e.target.value ? Number(e.target.value) : "")}><option value="">— нет —</option>{trucks.map(t => <option key={t.id} value={t.id}>{t.plate || t.label}</option>)}</select></div>
               <div className="field"><span className="field__label">Водитель</span><select className="field__input" value={form.driver_id} onChange={e => setF("driver_id", e.target.value ? Number(e.target.value) : "")}><option value="">— нет —</option>{drivers.map(d => <option key={d.id} value={d.id}>{driverFio(d)}</option>)}</select></div>
@@ -211,6 +217,58 @@ function Sel({ label, v, on, type, wide, opts }: { label: string; v: string; on:
       <span className="field__label">{label}</span>
       {opts ? <select className="field__input" value={v} onChange={e => on(e.target.value)}>{opts.map(o => <option key={o}>{o}</option>)}</select>
         : <input type={type || "text"} className="field__input" value={v} onChange={e => on(e.target.value)} />}
+    </div>
+  );
+}
+
+// Контрагент из справочника: автокомплит по /api/counterparties/ + автозаполнение
+// НДС по vat_rate выбранного + создание нового (POST) на лету. Порт старого
+// CounterpartyCombobox (при переезде на /newdash поле стало обычным текстом — баг).
+function CpCombobox({ list, value, onChange, onVat, onCreated }: {
+  list: Counterparty[]; value: string; onChange: (n: string) => void; onVat: (v: string) => void; onCreated: (cp: Counterparty) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [inp, setInp] = useState(value);
+  const [creating, setCreating] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => { setInp(value); }, [value]);
+  useEffect(() => {
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    if (open) document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [open]);
+  const q = inp.trim().toLowerCase();
+  const filtered = q ? list.filter(c => c.name.toLowerCase().includes(q)) : list;
+  const exact = list.some(c => c.name.toLowerCase() === q);
+  const showAdd = inp.trim() !== "" && !exact;
+  const pick = (c: Counterparty) => { setInp(c.name); onChange(c.name); if (c.vat_rate) onVat(String(c.vat_rate)); setOpen(false); };
+  const create = async () => {
+    const name = inp.trim(); if (!name || creating) return;
+    setCreating(true);
+    try { const c = await api.post<Counterparty>("/api/counterparties/", { name, inn: "" }); setInp(c.name); onChange(c.name); onCreated(c); }
+    catch { /* оставим введённое как есть */ } finally { setCreating(false); setOpen(false); }
+  };
+  return (
+    <div className="field nd-fdrop" ref={ref}>
+      <span className="field__label">Контрагент</span>
+      <input className="field__input" value={inp} placeholder="Начните вводить…"
+        onChange={e => { setInp(e.target.value); onChange(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)} />
+      {open && (filtered.length > 0 || showAdd) && (
+        <div className="nd-fdrop__menu">
+          {filtered.slice(0, 40).map(c => (
+            <button key={c.id} type="button" className="nd-fdrop__item" onClick={() => pick(c)}>
+              <span style={{ flex: 1 }}>{c.name}</span>
+              {c.vat_rate ? <span className="muted t-caption">НДС {c.vat_rate}%</span> : null}
+            </button>
+          ))}
+          {showAdd && (
+            <button type="button" className="nd-fdrop__item" style={{ color: "var(--accent-ink)" }} onClick={create} disabled={creating}>
+              ＋ Создать «{inp.trim()}»
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
