@@ -1173,9 +1173,10 @@
   .nd .filterbar { flex-wrap: wrap; gap: 8px; padding: 10px 16px; }
   .nd .nd-fdrop__menu { max-width: calc(100vw - 24px); left: 0; right: auto; }
 
-  /* ── Этап 5: дашборд в одну колонку, табло рейсов скрыто, редактор скрыт ── */
-  .nd .workarea { grid-template-columns: 1fr; gap: 12px; padding: 12px 12px calc(84px + env(safe-area-inset-bottom)); }
+  /* ── Этап 5: дашборд — виджеты во всю ширину, KPI-плитки 2×2, табло скрыто ── */
+  .nd .workarea { grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 12px 12px calc(16px + env(safe-area-inset-bottom)); }
   .nd .widget { grid-column: 1 / -1 !important; }
+  .nd .widget.kpi { grid-column: auto !important; }  /* KPI — по 2 в ряд (2×2) */
   .nd .widget[data-wkey="main"] { display: none; }   /* табло рейсов — на телефоне прячем */
   .nd .workarea .w-handle, .nd .workarea .w-resize-x,
   .nd .workarea .w-resize-y, .nd .workarea .w-remove { display: none !important; }
