@@ -9,10 +9,12 @@ import { api, ApiError, fileUrl } from "../../api";
 import NdMenu from "./NdMenu";
 import NdMultiSelect from "./NdMultiSelect";
 import NdSortReset from "./NdSortReset";
+import NdFilters, { NdFilterButton } from "./NdFilters";
+import NdPhoneHead from "./NdPhoneHead";
 import NdModal from "./NdModal";
 import NdDataTable from "./NdDataTable";
 import type { Column } from "./NdDataTable";
-import { fmtDateTime, NdSearch } from "./shared";
+import { fmtDateTime, NdSearch, useIsPhone } from "./shared";
 import "./newdash.css";
 
 type RepairRow = {
@@ -39,6 +41,10 @@ export default function NewDashRepair() {
   const [statusF, setStatusF] = useState<Set<string>>(new Set());
   const [sorted, setSorted] = useState(false);
   const resetSortRef = useRef<() => void>(() => {});
+  const isPhone = useIsPhone();
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const activeCount = (statusF.size ? 1 : 0) + (sorted ? 1 : 0);
+  const resetAllFilters = () => { setStatusF(new Set()); resetSortRef.current(); };
 
   const [advancingId, setAdvancingId] = useState<number | null>(null);
   const [closeDialog, setCloseDialog] = useState<{ rowId: number; comment: string } | null>(null);
@@ -122,28 +128,63 @@ export default function NewDashRepair() {
     <div className="nd">
       <NdMenu active="repair" />
       <main className="main">
-        <header className="topbar">
-          <div className="topbar__title">
-            <h1 className="t-h1" style={{ margin: 0 }}>Заявки на ремонт</h1>
-            <span className="t-mono muted">открытых · {openCount}</span>
+        {isPhone ? (
+          <>
+            <NdPhoneHead title="Ремонт" subtitle={`открытых · ${openCount}`} />
+            <div className="nd-searchrow">
+              <NdSearch value={q} onChange={setQ} placeholder="Машина, водитель, проблема…" />
+              <NdFilterButton count={activeCount} onClick={() => setFiltersOpen(true)} />
+            </div>
+          </>
+        ) : (
+          <header className="topbar">
+            <div className="topbar__title">
+              <h1 className="t-h1" style={{ margin: 0 }}>Заявки на ремонт</h1>
+              <span className="t-mono muted">открытых · {openCount}</span>
+            </div>
+            <div className="spacer" />
+            <NdSearch value={q} onChange={setQ} placeholder="Машина, водитель, проблема…" />
+          </header>
+        )}
+
+        {isPhone ? (
+          <NdFilters open={filtersOpen} onClose={() => setFiltersOpen(false)} onReset={resetAllFilters} section="Ремонт">
+            <NdMultiSelect label="Статус" options={STATUS_OPTS} selected={statusF} onChange={setStatusF} />
+            <NdSortReset active={sorted} onReset={() => resetSortRef.current()} />
+          </NdFilters>
+        ) : (
+          <div className="filterbar">
+            <NdMultiSelect label="Статус" options={STATUS_OPTS} selected={statusF} onChange={setStatusF} />
+            <NdSortReset active={sorted} onReset={() => resetSortRef.current()} />
+            <div className="spacer" />
+            <button className="btn btn--ghost" disabled={loading} onClick={load}>Обновить</button>
+            <button className="btn btn--ghost" onClick={() => setDense(d => !d)}>{dense ? "Обычно" : "Компактно"}</button>
           </div>
-          <div className="spacer" />
-          <NdSearch value={q} onChange={setQ} placeholder="Машина, водитель, проблема…" />
-        </header>
+        )}
 
-        <div className="filterbar">
-          <NdMultiSelect label="Статус" options={STATUS_OPTS} selected={statusF} onChange={setStatusF} />
-          <NdSortReset active={sorted} onReset={() => resetSortRef.current()} />
-          <div className="spacer" />
-          <button className="btn btn--ghost" disabled={loading} onClick={load}>Обновить</button>
-          <button className="btn btn--ghost" onClick={() => setDense(d => !d)}>{dense ? "Обычно" : "Компактно"}</button>
-        </div>
-
-        <div style={{ flex: 1, minHeight: 0, padding: "12px 24px 20px", display: "flex", flexDirection: "column" }}>
+        <div className={isPhone ? "nd-listwrap" : undefined} style={isPhone ? undefined : { flex: 1, minHeight: 0, padding: "12px 24px 20px", display: "flex", flexDirection: "column" }}>
           <NdDataTable<RepairRow>
             columns={columns} rows={visible} loading={loading} dense={dense} rowId={r => r.id}
             onSortActive={setSorted} resetRef={resetSortRef}
             sortKey="created_at" sortDir={-1}
+            card={r => {
+              const label = STATUS_LABEL[r.status] ?? r.status;
+              const next = STATUS_NEXT[r.status] ?? r.status;
+              const canAdvance = next !== r.status;
+              const ph = parsePhotos(r.photo_paths);
+              return {
+                title: <>{r.truck_label || "—"}{r.priority === "срочная" ? <span className="dot dot--crit" style={{ marginLeft: 6 }} title="Срочная" /> : null}</>,
+                subtitle: fmtDateTime(r.created_at, { utc: true }),
+                right: <span className={`status status--${statusTone(r.status)}`}>{label}</span>,
+                collapsible: true,
+                facts: [
+                  { label: "Водитель", value: r.driver_name || "—" },
+                  { label: "Проблема", value: r.text || "—" },
+                  { label: "Фото", value: ph.length ? <span style={{ display: "inline-flex", gap: 8 }}>{ph.map((p, i) => <a key={i} href={fileUrl(`/photos/${p}`)} target="_blank" rel="noreferrer" style={{ textDecoration: "none", fontSize: 16 }}>📷</a>)}</span> : "—" },
+                ],
+                actions: canAdvance ? <button type="button" className="btn btn--primary" style={{ width: "100%" }} disabled={advancingId === r.id} onClick={() => handleStatusClick(r)}>{STATUS_LABEL[next] ?? next}</button> : undefined,
+              };
+            }}
             empty={error ? "Не удалось загрузить" : "Заявок на ремонт нет"}
             emptyHint={error ? "Проверьте доступ" : "Заявки создают водители из мобильного кабинета"}
           />

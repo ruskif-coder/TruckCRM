@@ -8,6 +8,8 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../auth/AuthContext";
 import NdMenu from "./NdMenu";
 import NdSectionTabs, { SETTINGS_TABS } from "./NdSectionTabs";
+import NdPhoneHead from "./NdPhoneHead";
+import { useIsPhone } from "./shared";
 import "./newdash.css";
 
 export default function NewDashSettingsShell({
@@ -16,18 +18,23 @@ export default function NewDashSettingsShell({
   const { user } = useAuth();
   const navigate = useNavigate();
   const isAdmin = user?.role === "admin";
+  const isPhone = useIsPhone();
   const tabs = isAdmin ? SETTINGS_TABS : SETTINGS_TABS.slice(0, 1);
 
   return (
     <div className="nd">
       <NdMenu active="settings" />
       <main className="main" data-pad="wide">
-        <header className="topbar">
-          <div className="topbar__title">
-            <h1 className="t-h1" style={{ margin: 0 }}>{title}</h1>
-            {subtitle && <span className="t-mono muted">{subtitle}</span>}
-          </div>
-        </header>
+        {isPhone ? (
+          <NdPhoneHead title={title} subtitle={subtitle} />
+        ) : (
+          <header className="topbar">
+            <div className="topbar__title">
+              <h1 className="t-h1" style={{ margin: 0 }}>{title}</h1>
+              {subtitle && <span className="t-mono muted">{subtitle}</span>}
+            </div>
+          </header>
+        )}
 
         <NdSectionTabs tabs={tabs} right={isAdmin ? right : undefined} />
 

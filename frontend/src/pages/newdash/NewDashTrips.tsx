@@ -222,10 +222,6 @@ export default function NewDashTrips() {
               title="Рейсы"
               subtitle={`реестр · ${trips.length}`}
               onAdd={openImport}
-              menu={<>
-                <button className="btn btn--ghost" disabled={busy === "template"} onClick={handleTemplate}>Скачать шаблон .xlsx</button>
-                <button className="btn btn--ghost" disabled={busy === "export"} onClick={handleExport}>Экспорт в .xlsx</button>
-              </>}
             />
             <NdSectionTabs tabs={TRIPS_TABS} />
           </>
@@ -266,6 +262,12 @@ export default function NewDashTrips() {
           <div className="nd-searchrow">
             <NdSearch value={q} onChange={setQ} placeholder="Заявка, водитель, машина…" />
             <NdFilterButton count={activeCount} onClick={() => setFiltersOpen(true)} />
+            <button type="button" className="nd-searchrow__act" title="Скачать шаблон .xlsx" disabled={busy === "template"} onClick={handleTemplate}>
+              <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="1.5" width="9" height="12" rx="1.5" /><path d="M5.2 5h4.6" /><path d="M5.2 7.6h4.6" /><path d="M5.2 10.2h2.8" /></svg>
+            </button>
+            <button type="button" className="nd-searchrow__act" title="Экспорт в .xlsx" disabled={busy === "export"} onClick={handleExport}>
+              <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round"><path d="M7.5 1.5v8" /><path d="M4.2 6.2 7.5 9.5l3.3-3.3" /><path d="M2.4 12.5h10.2" /></svg>
+            </button>
           </div>
         )}
 

@@ -10,10 +10,12 @@ import { fmtDate } from "../../lib/format";
 import { useAuth } from "../../auth/AuthContext";
 import NdMenu from "./NdMenu";
 import NdSortReset from "./NdSortReset";
+import NdFilters, { NdFilterButton } from "./NdFilters";
+import NdPhoneHead from "./NdPhoneHead";
 import NdModal from "./NdModal";
 import NdDataTable from "./NdDataTable";
 import type { Column } from "./NdDataTable";
-import { NdSearch } from "./shared";
+import { NdSearch, useIsPhone } from "./shared";
 import "./newdash.css";
 
 const VEHICLE_TYPES = ["Грузовой", "Легковой", "Фура"];
@@ -68,6 +70,13 @@ function toPayload(f: FormState) {
   };
 }
 const displayName = (t: Truck) => t.brand || t.label || t.plate || "Без названия";
+// 2-символьная плитка-аватар: первая буква названия + первая цифра.
+const avatarLabel = (t: Truck) => {
+  const nm = displayName(t).trim();
+  const first = nm[0] || t.plate?.[0] || "?";
+  const digit = (nm.match(/\d/) || [""])[0];
+  return (first + digit).toUpperCase();
+};
 const isOverdue = (d: string | null) => !!d && new Date(d) < new Date();
 
 // Прогресс до ТО из fleet-stats (одометр − одометр последнего ТО) / интервал
@@ -110,6 +119,9 @@ export default function NewDashVehicles() {
   const [view, setView] = useState<"table" | "tiles">("table");
   const [sorted, setSorted] = useState(false);
   const resetSortRef = useRef<() => void>(() => {});
+  const isPhone = useIsPhone();
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const activeCount = sorted ? 1 : 0;
 
   const [viewTruck, setViewTruck] = useState<Truck | null>(null);
   const [editId, setEditId] = useState<number | null>(null);      // null = закрыто, 0 = новый, >0 = редактирование
@@ -212,32 +224,70 @@ export default function NewDashVehicles() {
     <div className="nd">
       <NdMenu active="cars" />
       <main className="main">
-        <header className="topbar">
-          <div className="topbar__title">
-            <h1 className="t-h1" style={{ margin: 0 }}>Машины</h1>
-            <span className="t-mono muted">парк · {trucks.length}</span>
-          </div>
-          <div className="spacer" />
-          <NdSearch value={q} onChange={setQ} placeholder="Название, гос. номер, СТС…" />
-          <div className="viewtoggle">
-            <button className="viewtoggle__btn" aria-pressed={view === "table"} title="Таблица" onClick={() => setView("table")}>
-              <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round"><path d="M2 4h11M2 7.5h11M2 11h11" /></svg>
-            </button>
-            <button className="viewtoggle__btn" aria-pressed={view === "tiles"} title="Плитки" onClick={() => setView("tiles")}>
-              <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth={1.7}><rect x="2" y="2" width="4.5" height="4.5" rx="1" /><rect x="8.5" y="2" width="4.5" height="4.5" rx="1" /><rect x="2" y="8.5" width="4.5" height="4.5" rx="1" /><rect x="8.5" y="8.5" width="4.5" height="4.5" rx="1" /></svg>
-            </button>
-          </div>
-          {view === "table" && <NdSortReset active={sorted} onReset={() => resetSortRef.current()} />}
-          <button className="btn btn--accent" onClick={openCreate}>Добавить</button>
-        </header>
+        {isPhone ? (
+          <>
+            <NdPhoneHead title="Машины" subtitle={`парк · ${trucks.length}`} onAdd={openCreate} />
+            <div className="nd-searchrow">
+              <NdSearch value={q} onChange={setQ} placeholder="Название, гос. номер, СТС…" />
+              <NdFilterButton count={activeCount} onClick={() => setFiltersOpen(true)} />
+            </div>
+            <NdFilters open={filtersOpen} onClose={() => setFiltersOpen(false)} onReset={() => resetSortRef.current()} section="Машины">
+              <NdSortReset active={sorted} onReset={() => resetSortRef.current()} />
+            </NdFilters>
+          </>
+        ) : (
+          <header className="topbar">
+            <div className="topbar__title">
+              <h1 className="t-h1" style={{ margin: 0 }}>Машины</h1>
+              <span className="t-mono muted">парк · {trucks.length}</span>
+            </div>
+            <div className="spacer" />
+            <NdSearch value={q} onChange={setQ} placeholder="Название, гос. номер, СТС…" />
+            <div className="viewtoggle">
+              <button className="viewtoggle__btn" aria-pressed={view === "table"} title="Таблица" onClick={() => setView("table")}>
+                <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round"><path d="M2 4h11M2 7.5h11M2 11h11" /></svg>
+              </button>
+              <button className="viewtoggle__btn" aria-pressed={view === "tiles"} title="Плитки" onClick={() => setView("tiles")}>
+                <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth={1.7}><rect x="2" y="2" width="4.5" height="4.5" rx="1" /><rect x="8.5" y="2" width="4.5" height="4.5" rx="1" /><rect x="2" y="8.5" width="4.5" height="4.5" rx="1" /><rect x="8.5" y="8.5" width="4.5" height="4.5" rx="1" /></svg>
+              </button>
+            </div>
+            {view === "table" && <NdSortReset active={sorted} onReset={() => resetSortRef.current()} />}
+            <button className="btn btn--accent" onClick={openCreate}>Добавить</button>
+          </header>
+        )}
 
-        <div style={{ flex: 1, minHeight: 0, padding: "16px 24px 20px", display: "flex", flexDirection: "column", overflow: view === "tiles" ? "auto" : "hidden" }}>
-          {view === "table" ? (
+        <div className={isPhone ? "nd-listwrap" : undefined} style={isPhone ? undefined : { flex: 1, minHeight: 0, padding: "16px 24px 20px", display: "flex", flexDirection: "column", overflow: view === "tiles" ? "auto" : "hidden" }}>
+          {(view === "table" || isPhone) ? (
             <NdDataTable<Truck>
               columns={columns} rows={rows} loading={loading} rowId={r => r.id}
               onSortActive={setSorted} resetRef={resetSortRef}
               sortKey="brand" sortDir={1}
               onRowClick={r => setViewTruck(r)}
+              card={t => {
+                const st = stats.get(t.id); const sess = sessions.get(t.id);
+                const mp = maintProgress(t, st);
+                const toChip = mp
+                  ? <span className={`status status--${mp.remain <= 0 ? "neg" : mp.pct >= 70 ? "warn" : "ok"}`}>{mp.remain > 0 ? `ТО через ${Math.round(mp.remain).toLocaleString("ru-RU")} км` : "ТО просрочено"}</span>
+                  : <span className={`status status--${isOverdue(t.tech_inspection_date) ? "neg" : "ok"}`}>ТО {fmtDate(t.tech_inspection_date)}</span>;
+                return {
+                  avatar: <span className="avatar avatar--square">{avatarLabel(t)}</span>,
+                  title: t.plate || "—",
+                  subtitle: `${displayName(t)}${t.body_type ? " · " + t.body_type : ""}`,
+                  right: sess ? <span className="status status--ok">В работе</span> : <span className="status status--idle">Свободна</span>,
+                  extra: <>
+                    <span className={`status status--${isOverdue(t.osago_date) ? "neg" : "ok"}`}>ОСАГО {fmtDate(t.osago_date)}</span>
+                    <span className={`status status--${isOverdue(t.kasko_date) ? "neg" : "ok"}`}>КАСКО {fmtDate(t.kasko_date)}</span>
+                    {toChip}
+                  </>,
+                  collapsible: true,
+                  facts: [
+                    { label: "Одометр", value: st?.last_odometer != null ? Math.round(st.last_odometer).toLocaleString("ru-RU") : "—" },
+                    { label: "Год", value: t.year ?? "—" },
+                    { label: "Сессия П/П", value: sess ? sess.driver_name : "—" },
+                  ],
+                  actions: <button type="button" className="btn btn--primary" style={{ width: "100%" }} onClick={() => setViewTruck(t)}>Открыть карточку</button>,
+                };
+              }}
               empty={error ? "Не удалось загрузить" : "Машин нет"} emptyHint={error ? "Проверьте доступ" : "Добавьте первую машину"}
             />
           ) : loading ? (

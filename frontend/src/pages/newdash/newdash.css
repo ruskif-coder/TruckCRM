@@ -1183,13 +1183,14 @@
 
 /* ═══ Мобилизация: правки после ревью (сводка/дашборд/фильтры), ≤640px ═══════ */
 @media (max-width: 640px) {
-  /* Сводка-виджеты: сетка 2×2 (было — гигантские блоки во всю ширину). */
+  /* Сводка-виджеты: сетка 2×2, компактные плитки (как карточки списка). */
   .nd .summarystrip {
-    display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;
-    padding: 12px 12px 2px;
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;
+    padding: 10px 12px 2px;
   }
-  .nd .summary { padding: 12px 14px; }
-  .nd .summary__value { font-size: 20px; margin-top: 4px; }
+  .nd .summary { padding: 10px 12px; border: 1px solid var(--line); }
+  .nd .summary__label { font-size: 9px; }
+  .nd .summary__value { font-size: 17px; margin-top: 2px; }
 
   /* Дашборд: виджет-таблица «Расчёт по неделям» на телефоне не нужна (шаблон). */
   .nd .widget[data-wkey="weekly"] { display: none; }
@@ -1263,3 +1264,97 @@
 .nd .nd-ecard__right { flex: none; text-align: right; align-self: flex-start; }
 .nd .nd-ecard__chev { flex: none; color: var(--text-3); transition: transform .18s ease; margin-top: 2px; }
 .nd .nd-ecard__chev[data-open] { transform: rotate(180deg); }
+
+/* ═══ Навигация телефона: бургер → лист «Все разделы» (таб-бар убран) ═══════ */
+@media (max-width: 640px) {
+  /* таб-бара больше нет — убираем запас снизу у стола */
+  .nd .workarea { padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
+
+  /* квадратные action-кнопки в строке поиска (Excel и т.п.) — в ряд с воронкой */
+  .nd .nd-searchrow__act {
+    flex: none; width: 44px; height: 44px; border-radius: 12px;
+    border: 1px solid var(--line); background: var(--surface); color: var(--text-2);
+    display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+  }
+  .nd .nd-searchrow__act:disabled { opacity: .5; }
+
+  /* Лист «Все разделы» */
+  .nd-navsheet { position: fixed; inset: 0; z-index: 55; display: flex; flex-direction: column; }
+  .nd-navsheet__panel { max-height: 86%; }
+  .nd-navsheet__head { display: flex; align-items: center; gap: 12px; padding: 4px 16px 14px; border-bottom: 1px solid var(--line); }
+  .nd .nd-navsheet__head .menu__mark { flex: none; }
+  .nd-navsheet__title { font: 700 18px var(--font-ui); color: var(--ink); }
+  .nd-navsheet__sub { font: 500 12px var(--font-mono); color: var(--text-3); margin-top: 2px; }
+  .nd-navsheet__list { padding: 6px 8px; display: flex; flex-direction: column; }
+  .nd-navsheet__row {
+    display: flex; align-items: center; gap: 13px; width: 100%; min-height: 54px;
+    padding: 8px 10px; border: 0; border-radius: 14px; background: transparent;
+    color: var(--ink); cursor: pointer; text-align: left; font-family: inherit;
+  }
+  .nd-navsheet__row[aria-current="page"] { background: var(--surface); }
+  .nd-navsheet__ico { flex: none; width: 24px; display: flex; justify-content: center; color: var(--text-2); }
+  .nd-navsheet__ico svg { opacity: .7; }
+  .nd-navsheet__text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .nd-navsheet__label { font: 600 15px var(--font-ui); color: var(--ink); }
+  .nd-navsheet__hint { font-size: 12px; color: var(--text-3); margin-top: 1px; }
+  .nd-navsheet__chev { flex: none; color: var(--text-4); font-size: 22px; line-height: 1; padding-right: 4px; }
+  .nd-navsheet__kids { display: flex; flex-direction: column; padding: 0 0 6px 47px; }
+  .nd-navsheet__kid { border: 0; background: transparent; color: var(--text-2); text-align: left; padding: 7px 10px; font: 500 13px var(--font-ui); cursor: pointer; border-radius: 10px; }
+  .nd-navsheet__kid.is-active { color: var(--accent-ink); font-weight: 600; }
+  .nd-navsheet__foot { display: flex; gap: 8px; padding: 12px 16px calc(16px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); margin-top: 4px; }
+}
+
+/* NdEntityCard: слот действий в раскрытой карточке (напр. «Посмотреть акт»). */
+.nd .nd-ecard__actions { padding-top: 12px; display: flex; gap: 8px; }
+
+/* Пейджер на телефоне: селектор «строк на странице» не нужен — прячем. */
+@media (max-width: 640px) { .nd .pager__perpage { display: none; } }
+
+/* NdEntityCard: аватар слева от заголовка + строка чипов (extra) в раскрытой карточке. */
+.nd .nd-ecard__avatar { flex: none; align-self: flex-start; }
+.nd .nd-ecard__extra { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 12px; }
+/* плитка-аватар машины (квадрат с инициалами) */
+.nd .nd-ecard__avatar .tile,
+.nd .tile { flex: none; width: 38px; height: 38px; border-radius: 11px; background: var(--surface-3); color: var(--text-2); display: flex; align-items: center; justify-content: center; font: 600 12px var(--font-mono); }
+
+/* Аватар в карточке крупнее меню-аватара (под макеты 05/06-mob). */
+.nd .nd-ecard__avatar .avatar { width: 38px; height: 38px; font-size: 13px; }
+
+/* Выписка баланса на телефоне — список строк вместо таблицы (.oplist). */
+.nd .oplist { display: flex; flex-direction: column; }
+.nd .oplist__row { padding: 11px 2px; border-bottom: 1px solid var(--line-row); }
+.nd .oplist__main { display: flex; align-items: center; gap: 8px; }
+.nd .oplist__op { flex: 1; min-width: 0; font: 500 14px var(--font-ui); color: var(--ink); }
+.nd .oplist__amount { flex: none; font-family: var(--font-mono); font-weight: 600; font-variant-numeric: tabular-nums; }
+.nd .oplist__meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 3px; padding-left: 16px; font: 500 12px var(--font-mono); color: var(--text-3); }
+
+/* Финансы (моб): тёмная карточка «Сальдо» вместо белых плиток сводки. */
+@media (max-width: 640px) {
+  .nd .nd-saldo { margin: 8px 12px 2px; background: var(--dossier); color: var(--on-dossier); border-radius: var(--r-lg); padding: 16px; }
+  .nd .nd-saldo__cap { font: 500 10px var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: rgba(255, 255, 255, .5); }
+  .nd .nd-saldo__value { font-size: 30px; font-weight: 300; letter-spacing: -.02em; margin: 8px 0 14px; font-variant-numeric: tabular-nums; }
+  .nd .nd-saldo__row { display: flex; gap: 28px; border-top: 1px solid rgba(255, 255, 255, .12); padding-top: 12px; }
+  .nd .nd-saldo__lbl { font: 500 10px var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: rgba(255, 255, 255, .5); }
+  .nd .nd-saldo__sub { font: 500 15px var(--font-mono); margin-top: 3px; font-variant-numeric: tabular-nums; }
+}
+
+/* Модалка «Биллинг» перевозчика — недельная разбивка (Отчёты→Перевозчики). */
+.nd .bill-week {
+  display: grid; grid-template-columns: minmax(92px, 1.3fr) 40px repeat(3, minmax(56px, 1fr));
+  gap: 4px 8px; align-items: center; padding: 8px 2px; border-bottom: 1px solid var(--line-row);
+  font: 500 12px var(--font-mono); font-variant-numeric: tabular-nums; color: var(--ink);
+}
+.nd .bill-week > span:not(.bill-week__period) { text-align: right; }
+.nd .bill-week--head { border-bottom: 1px solid var(--line); }
+.nd .bill-week--head span { font: 500 10px var(--font-mono); text-transform: uppercase; letter-spacing: .04em; color: var(--text-4); }
+.nd .bill-week--total { border-top: 1px solid var(--line); border-bottom: 0; font-weight: 600; margin-top: 2px; }
+.nd .bill-week__period { white-space: nowrap; }
+.nd .bill-week__net { font-weight: 600; }
+
+/* Выравнивание ширины на телефоне: на страницах data-pad="wide" (Отчёты) сводка
+   получала 32px по бокам — уже карточек. Приводим к общему отступу 12px. */
+.nd .nd-pgnote { margin: 10px 32px 0; }
+@media (max-width: 640px) {
+  .nd .main[data-pad="wide"] .summarystrip { padding-left: 12px; padding-right: 12px; }
+  .nd .nd-pgnote { margin: 8px 12px 0; }
+}

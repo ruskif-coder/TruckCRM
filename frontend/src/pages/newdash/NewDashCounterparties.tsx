@@ -8,10 +8,12 @@ import { api, ApiError } from "../../api";
 import NdMenu from "./NdMenu";
 import NdSectionTabs, { REFS_TABS } from "./NdSectionTabs";
 import NdSortReset from "./NdSortReset";
+import NdFilters, { NdFilterButton } from "./NdFilters";
+import NdPhoneHead from "./NdPhoneHead";
 import NdModal from "./NdModal";
 import NdDataTable from "./NdDataTable";
 import type { Column } from "./NdDataTable";
-import { NdSearch } from "./shared";
+import { NdSearch, useIsPhone } from "./shared";
 import "./newdash.css";
 
 type Counterparty = { id: number; name: string; inn: string; vat_rate: number };
@@ -26,6 +28,8 @@ export default function NewDashCounterparties() {
   const [dense, setDense] = useState(true);
   const [sorted, setSorted] = useState(false);
   const resetSortRef = useRef<() => void>(() => {});
+  const isPhone = useIsPhone();
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const [editId, setEditId] = useState<number | null>(null);   // null закрыто, 0 новый, >0 правка
   const [form, setForm] = useState<FS>(EMPTY);
@@ -82,29 +86,50 @@ export default function NewDashCounterparties() {
     <div className="nd">
       <NdMenu active="refs" />
       <main className="main">
-        <header className="topbar">
-          <div className="topbar__title">
-            <h1 className="t-h1" style={{ margin: 0 }}>Контрагенты</h1>
-            <span className="t-mono muted">справочник · {list.length}</span>
-          </div>
-          <div className="spacer" />
-          <NdSearch value={q} onChange={setQ} placeholder="Название, ИНН…" />
-        </header>
+        {isPhone ? (
+          <>
+            <NdPhoneHead title="Контрагенты" subtitle={`справочник · ${list.length}`} onAdd={openCreate} />
+            <NdSectionTabs tabs={REFS_TABS} />
+            <div className="nd-searchrow">
+              <NdSearch value={q} onChange={setQ} placeholder="Название, ИНН…" />
+              <NdFilterButton count={sorted ? 1 : 0} onClick={() => setFiltersOpen(true)} />
+            </div>
+          </>
+        ) : (
+          <>
+            <header className="topbar">
+              <div className="topbar__title">
+                <h1 className="t-h1" style={{ margin: 0 }}>Контрагенты</h1>
+                <span className="t-mono muted">справочник · {list.length}</span>
+              </div>
+              <div className="spacer" />
+              <NdSearch value={q} onChange={setQ} placeholder="Название, ИНН…" />
+            </header>
+            <NdSectionTabs tabs={REFS_TABS} right={<>
+              <button className="btn btn--ghost" onClick={() => setDense(d => !d)}>{dense ? "Обычно" : "Компактно"}</button>
+              <button className="btn btn--accent" onClick={openCreate}>Добавить контрагента</button>
+            </>} />
+          </>
+        )}
 
-        <NdSectionTabs tabs={REFS_TABS} right={<>
-          <button className="btn btn--ghost" onClick={() => setDense(d => !d)}>{dense ? "Обычно" : "Компактно"}</button>
-          <button className="btn btn--accent" onClick={openCreate}>Добавить контрагента</button>
-        </>} />
-
-        <div className="filterbar">
+        <NdFilters open={filtersOpen} onClose={() => setFiltersOpen(false)} onReset={() => resetSortRef.current()} section="Контрагенты">
           <NdSortReset active={sorted} onReset={() => resetSortRef.current()} />
-        </div>
+        </NdFilters>
 
-        <div style={{ flex: 1, minHeight: 0, padding: "12px 24px 20px", display: "flex", flexDirection: "column" }}>
+        <div className={isPhone ? "nd-listwrap" : undefined} style={isPhone ? undefined : { flex: 1, minHeight: 0, padding: "12px 24px 20px", display: "flex", flexDirection: "column" }}>
           <NdDataTable<Counterparty>
             columns={columns} rows={rows} loading={loading} dense={dense} rowId={r => r.id}
             onSortActive={setSorted} resetRef={resetSortRef}
             sortKey="name" sortDir={1} onRowClick={r => openEdit(r)}
+            card={r => ({
+              title: r.name,
+              right: <span className={"status status--" + (r.inn ? "ok" : "risk")}>{r.inn ? "Заполнен" : "Дозаполнить"}</span>,
+              collapsible: true,
+              facts: [
+                { label: "ИНН", value: r.inn || "—" },
+                { label: "НДС %", value: r.vat_rate ? `${r.vat_rate}%` : "—" },
+              ],
+            })}
             empty={error ? "Не удалось загрузить" : "Контрагентов нет"}
             emptyHint={error ? "Проверьте доступ" : "Добавьте первого контрагента"}
           />

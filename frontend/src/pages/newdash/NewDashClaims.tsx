@@ -10,10 +10,12 @@ import NdMenu from "./NdMenu";
 import NdSectionTabs, { FINANCE_TABS } from "./NdSectionTabs";
 import NdMultiSelect from "./NdMultiSelect";
 import NdSortReset from "./NdSortReset";
+import NdFilters, { NdFilterButton } from "./NdFilters";
+import NdPhoneHead from "./NdPhoneHead";
 import NdModal from "./NdModal";
 import NdDataTable from "./NdDataTable";
 import type { Column } from "./NdDataTable";
-import { fmtDateTime, NdSearch } from "./shared";
+import { fmtDateTime, NdSearch, useIsPhone } from "./shared";
 import "./newdash.css";
 
 type Claim = {
@@ -35,6 +37,10 @@ export default function NewDashClaims() {
   const [statusF, setStatusF] = useState<Set<string>>(new Set());
   const [sorted, setSorted] = useState(false);
   const resetSortRef = useRef<() => void>(() => {});
+  const isPhone = useIsPhone();
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const activeCount = (statusF.size ? 1 : 0) + (sorted ? 1 : 0);
+  const resetAllFilters = () => { setStatusF(new Set()); resetSortRef.current(); };
 
   const [view, setView] = useState<Claim | null>(null);
   const [busy, setBusy] = useState(false);
@@ -86,27 +92,51 @@ export default function NewDashClaims() {
     <div className="nd">
       <NdMenu active="finance" />
       <main className="main">
-        <header className="topbar">
-          <div className="topbar__title"><h1 className="t-h1" style={{ margin: 0 }}>Заявки на компенсацию</h1><span className="t-mono muted">всего · {claims.length}{pendingCount ? ` · ${pendingCount} на рассмотрении` : ""}</span></div>
-          <div className="spacer" />
-          <NdSearch value={q} onChange={setQ} placeholder="Водитель, машина, статья…" />
-        </header>
+        {isPhone ? (
+          <>
+            <NdPhoneHead title="Заявки" subtitle={`всего · ${claims.length}${pendingCount ? ` · ${pendingCount} на рассм.` : ""}`} />
+            <NdSectionTabs tabs={FINANCE_TABS} />
+            <div className="nd-searchrow">
+              <NdSearch value={q} onChange={setQ} placeholder="Водитель, машина, статья…" />
+              <NdFilterButton count={activeCount} onClick={() => setFiltersOpen(true)} />
+            </div>
+          </>
+        ) : (
+          <>
+            <header className="topbar">
+              <div className="topbar__title"><h1 className="t-h1" style={{ margin: 0 }}>Заявки на компенсацию</h1><span className="t-mono muted">всего · {claims.length}{pendingCount ? ` · ${pendingCount} на рассмотрении` : ""}</span></div>
+              <div className="spacer" />
+              <NdSearch value={q} onChange={setQ} placeholder="Водитель, машина, статья…" />
+            </header>
+            <NdSectionTabs tabs={FINANCE_TABS} right={
+              <button className="btn btn--ghost" onClick={() => setDense(d => !d)}>{dense ? "Обычно" : "Компактно"}</button>
+            } />
+          </>
+        )}
 
-        <NdSectionTabs tabs={FINANCE_TABS} right={
-          <button className="btn btn--ghost" onClick={() => setDense(d => !d)}>{dense ? "Обычно" : "Компактно"}</button>
-        } />
-
-        <div className="filterbar">
+        <NdFilters open={filtersOpen} onClose={() => setFiltersOpen(false)} onReset={resetAllFilters} section="Заявки">
           <NdMultiSelect label="Статус" options={statusOptions} selected={statusF} onChange={setStatusF} />
           <NdSortReset active={sorted} onReset={() => resetSortRef.current()} />
-        </div>
+        </NdFilters>
 
-        <div style={{ flex: 1, minHeight: 0, padding: "12px 24px 20px", display: "flex", flexDirection: "column" }}>
+        <div className={isPhone ? "nd-listwrap" : undefined} style={isPhone ? undefined : { flex: 1, minHeight: 0, padding: "12px 24px 20px", display: "flex", flexDirection: "column" }}>
           <NdDataTable<Claim>
             columns={columns} rows={rows} loading={loading} dense={dense}
             onSortActive={setSorted} resetRef={resetSortRef}
             sortKey="created_at" sortDir={-1} rowId={r => r.id}
             onRowClick={c => { setRejecting(false); setRejectReason(""); setView(c); }}
+            card={c => ({
+              title: <>Заявка · {money(c.amount)}<span className={`status status--${statusTone(c.status)}`} style={{ marginLeft: 6 }}>{c.status}</span></>,
+              subtitle: c.driver_name,
+              collapsible: true,
+              facts: [
+                { label: "Машина", value: c.truck_label || "—" },
+                { label: "Статья", value: c.category || "—" },
+                { label: "Дата расхода", value: c.expense_date ? fmtDate(c.expense_date) : "—" },
+                { label: "Создана", value: fmtDateTime(c.created_at) },
+              ],
+              actions: <button type="button" className="btn btn--primary" style={{ width: "100%" }} onClick={() => { setRejecting(false); setRejectReason(""); setView(c); }}>Открыть заявку</button>,
+            })}
             empty={error ? "Не удалось загрузить" : "Заявок нет"} emptyHint={error ? "Проверьте доступ" : "Заявки создают водители из мобильного кабинета"}
           />
         </div>

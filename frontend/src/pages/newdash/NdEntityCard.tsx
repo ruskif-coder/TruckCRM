@@ -13,10 +13,13 @@ import type { ReactNode } from "react";
 
 export type NdFact = { label: string; value: ReactNode };
 export type NdEntityCardProps = {
+  avatar?: ReactNode;         // плитка/кружок с инициалами слева от заголовка
   title: ReactNode;
   subtitle?: ReactNode;
   right?: ReactNode;          // правый слот шапки (статус-чип или сумма/штраф)
+  extra?: ReactNode;          // строка чипов и т.п. в раскрытой карточке (перед фактами)
   facts?: NdFact[];
+  actions?: ReactNode;        // кнопки в раскрытой карточке (напр. «Посмотреть акт»)
   onClick?: () => void;
   clickable?: boolean;
   collapsible?: boolean;      // свернуть факты по умолчанию, раскрывать по тапу
@@ -34,12 +37,13 @@ const Chevron = ({ open }: { open: boolean }) => (
 export default function NdEntityCard(p: NdEntityCardProps) {
   const [open, setOpen] = useState(false);
   const hasFacts = !!(p.facts && p.facts.length);
-  const showFacts = hasFacts && (!p.collapsible || open);
-  const clickable = p.collapsible ? hasFacts : !!p.clickable;
+  const hasExtra = hasFacts || !!p.actions || !!p.extra;
+  const showExtra = hasExtra && (!p.collapsible || open);
+  const clickable = p.collapsible ? hasExtra : !!p.clickable;
 
   const onCardClick = (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest("[data-pick]")) return;
-    if (p.collapsible) { if (hasFacts) setOpen(o => !o); return; }
+    if (p.collapsible) { if (hasExtra) setOpen(o => !o); return; }
     p.onClick?.();
   };
 
@@ -54,14 +58,16 @@ export default function NdEntityCard(p: NdEntityCardProps) {
           <button className="checkbox nd-ecard__pick" role="checkbox" aria-checked={p.selected} data-pick
             onClick={e => { e.stopPropagation(); p.onToggle?.(); }} />
         )}
+        {p.avatar ? <span className="nd-ecard__avatar">{p.avatar}</span> : null}
         <div className="nd-ecard__title-box">
           <div className="nd-ecard__title">{p.title}</div>
           {p.subtitle ? <div className="nd-ecard__subtitle">{p.subtitle}</div> : null}
         </div>
         {p.right ? <div className="nd-ecard__right">{p.right}</div> : null}
-        {p.collapsible && hasFacts ? <Chevron open={open} /> : null}
+        {p.collapsible && hasExtra ? <Chevron open={open} /> : null}
       </div>
-      {showFacts ? (
+      {showExtra && p.extra ? <div className="nd-ecard__extra">{p.extra}</div> : null}
+      {showExtra && hasFacts ? (
         <div className="nd-ecard__facts">
           {p.facts!.map((f, i) => (
             <div className="nd-ecard__fact" key={i}>
@@ -70,6 +76,9 @@ export default function NdEntityCard(p: NdEntityCardProps) {
             </div>
           ))}
         </div>
+      ) : null}
+      {showExtra && p.actions ? (
+        <div className="nd-ecard__actions" onClick={e => e.stopPropagation()}>{p.actions}</div>
       ) : null}
     </div>
   );

@@ -9,10 +9,12 @@ import { api, ApiError } from "../../api";
 import { fmtDate, money } from "../../lib/format";
 import NdMenu from "./NdMenu";
 import NdSortReset from "./NdSortReset";
+import NdFilters, { NdFilterButton } from "./NdFilters";
+import NdPhoneHead from "./NdPhoneHead";
 import NdModal from "./NdModal";
 import NdDataTable from "./NdDataTable";
 import type { Column } from "./NdDataTable";
-import { NdField, NdSearch } from "./shared";
+import { NdField, NdSearch, useIsPhone } from "./shared";
 import NdTxModal from "./NdTxModal";
 import type { TxKind } from "./NdTxModal";
 import { useAuth } from "../../auth/AuthContext";
@@ -74,6 +76,7 @@ function lastReportingWeek() {
 }
 
 const fullName = (d: Driver) => [d.last_name, d.first_name, d.middle_name].filter(Boolean).join(" ") || d.name || "—";
+const initialsOf = (fio: string) => fio.trim().split(/\s+/).slice(0, 2).map(w => w[0] || "").join("").toUpperCase() || "?";
 
 type FS = {
   name: string; phone: string; notes: string; mobile_login: string; mobile_password: string;
@@ -133,6 +136,9 @@ export default function NewDashDrivers() {
   const [view, setView] = useState<"table" | "tiles">("table");
   const [sorted, setSorted] = useState(false);
   const resetSortRef = useRef<() => void>(() => {});
+  const isPhone = useIsPhone();
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const activeCount = (sorted ? 1 : 0) + (!hideInactive ? 1 : 0);
 
   const [editId, setEditId] = useState<number | null>(null);   // null закрыто, 0 новый, >0 правка
   const [form, setForm] = useState<FS>(EMPTY);
@@ -314,36 +320,73 @@ export default function NewDashDrivers() {
     <div className="nd">
       <NdMenu active="drivers" />
       <main className="main">
-        <header className="topbar">
-          <div className="topbar__title">
-            <h1 className="t-h1" style={{ margin: 0 }}>Водители</h1>
-            <span className="t-mono muted">штат · {drivers.length}</span>
-          </div>
-          <div className="spacer" />
-          <NdSearch value={q} onChange={setQ} placeholder="ФИО, телефон…" width={240} />
-          <button type="button" className="switch" aria-pressed={!hideInactive} onClick={() => setHideInactive(v => !v)}>
-            <span className="switch__track"><span className="switch__knob" /></span>
-            Неактивные
-          </button>
-          <div className="viewtoggle">
-            <button className="viewtoggle__btn" aria-pressed={view === "table"} title="Таблица" onClick={() => setView("table")}>
-              <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round"><path d="M2 4h11M2 7.5h11M2 11h11" /></svg>
+        {isPhone ? (
+          <>
+            <NdPhoneHead title="Водители" subtitle={`штат · ${drivers.length}`} onAdd={openCreate} />
+            <div className="nd-searchrow">
+              <NdSearch value={q} onChange={setQ} placeholder="ФИО, телефон…" />
+              <NdFilterButton count={activeCount} onClick={() => setFiltersOpen(true)} />
+            </div>
+            <NdFilters open={filtersOpen} onClose={() => setFiltersOpen(false)} onReset={() => { setHideInactive(true); resetSortRef.current(); }} section="Водители">
+              <button type="button" className="switch" aria-pressed={!hideInactive} onClick={() => setHideInactive(v => !v)}>
+                <span className="switch__track"><span className="switch__knob" /></span>
+                Показывать неактивных
+              </button>
+              <NdSortReset active={sorted} onReset={() => resetSortRef.current()} />
+            </NdFilters>
+          </>
+        ) : (
+          <header className="topbar">
+            <div className="topbar__title">
+              <h1 className="t-h1" style={{ margin: 0 }}>Водители</h1>
+              <span className="t-mono muted">штат · {drivers.length}</span>
+            </div>
+            <div className="spacer" />
+            <NdSearch value={q} onChange={setQ} placeholder="ФИО, телефон…" width={240} />
+            <button type="button" className="switch" aria-pressed={!hideInactive} onClick={() => setHideInactive(v => !v)}>
+              <span className="switch__track"><span className="switch__knob" /></span>
+              Неактивные
             </button>
-            <button className="viewtoggle__btn" aria-pressed={view === "tiles"} title="Плитки" onClick={() => setView("tiles")}>
-              <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth={1.7}><rect x="2" y="2" width="4.5" height="4.5" rx="1" /><rect x="8.5" y="2" width="4.5" height="4.5" rx="1" /><rect x="2" y="8.5" width="4.5" height="4.5" rx="1" /><rect x="8.5" y="8.5" width="4.5" height="4.5" rx="1" /></svg>
-            </button>
-          </div>
-          {view === "table" && <NdSortReset active={sorted} onReset={() => resetSortRef.current()} />}
-          <button className="btn btn--accent" onClick={openCreate}>Добавить</button>
-        </header>
+            <div className="viewtoggle">
+              <button className="viewtoggle__btn" aria-pressed={view === "table"} title="Таблица" onClick={() => setView("table")}>
+                <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round"><path d="M2 4h11M2 7.5h11M2 11h11" /></svg>
+              </button>
+              <button className="viewtoggle__btn" aria-pressed={view === "tiles"} title="Плитки" onClick={() => setView("tiles")}>
+                <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth={1.7}><rect x="2" y="2" width="4.5" height="4.5" rx="1" /><rect x="8.5" y="2" width="4.5" height="4.5" rx="1" /><rect x="2" y="8.5" width="4.5" height="4.5" rx="1" /><rect x="8.5" y="8.5" width="4.5" height="4.5" rx="1" /></svg>
+              </button>
+            </div>
+            {view === "table" && <NdSortReset active={sorted} onReset={() => resetSortRef.current()} />}
+            <button className="btn btn--accent" onClick={openCreate}>Добавить</button>
+          </header>
+        )}
 
-        <div style={{ flex: 1, minHeight: 0, padding: "16px 24px 20px", display: "flex", flexDirection: "column", overflow: view === "tiles" ? "auto" : "hidden" }}>
-          {view === "table" ? (
+        <div className={isPhone ? "nd-listwrap" : undefined} style={isPhone ? undefined : { flex: 1, minHeight: 0, padding: "16px 24px 20px", display: "flex", flexDirection: "column", overflow: view === "tiles" ? "auto" : "hidden" }}>
+          {(view === "table" || isPhone) ? (
             <NdDataTable<Row>
               columns={columns} rows={rows} loading={loading} rowId={r => r.id}
               onSortActive={setSorted} resetRef={resetSortRef}
               sortKey="fio" sortDir={1}
               onRowClick={r => openEdit(r)}
+              card={r => ({
+                avatar: <span className="avatar">{initialsOf(r.fio)}</span>,
+                title: r.fio,
+                subtitle: r.phone || "—",
+                right: <div style={{ textAlign: "right" }}>
+                  <div className={"num " + (r.balance < 0 ? "neg" : r.balance > 0 ? "pos" : "")} style={{ fontFamily: "var(--font-mono)", fontWeight: 600, fontSize: 15 }}>{money(r.balance)}</div>
+                  <div className="t-mono-label">Баланс</div>
+                </div>,
+                collapsible: true,
+                facts: [
+                  { label: "Рейсов", value: r.tripsTotal },
+                  { label: "За неделю", value: r.tripsWeek },
+                  { label: "Пробег, км", value: r.mileage > 0 ? r.mileage.toLocaleString("ru-RU") : "—" },
+                  { label: "Условия", value: condSummary(r.rateList).text },
+                ],
+                actions: <>
+                  <button type="button" className="btn btn--primary" style={{ flex: 1 }} onClick={() => openEdit(r)}>Анкета</button>
+                  <button type="button" className="btn btn--ghost" style={{ flex: 1 }} onClick={() => openLedger(r)}>Выписка</button>
+                </>,
+              })}
               empty={error ? "Не удалось загрузить" : "Водителей нет"} emptyHint={error ? "Проверьте доступ" : "Добавьте первого водителя"}
             />
           ) : loading ? (
@@ -538,30 +581,45 @@ export default function NewDashDrivers() {
               { label: "Закрыть", kind: "primary", grow: true, onClick: () => setLedgerFor(null) },
             ]}
           >
-            <div className="table-card" style={{ flex: 1, minHeight: 0 }}>
-              <div className="table-scroll">
-                <div className="table" style={{ gridTemplateColumns: "110px 1fr 140px minmax(220px, 1.4fr)" }}>
-                  <div className="table__head">
-                    <button className="table__th">Дата</button>
-                    <button className="table__th">Операция</button>
-                    <button className="table__th" style={{ justifyContent: "flex-end" }}>Сумма</button>
-                    <button className="table__th">Комментарий</button>
-                  </div>
-                  {ledger === null ? (
-                    <div className="table__td" style={{ gridColumn: "1/-1", color: "var(--text-3)" }}>Загрузка…</div>
-                  ) : L.length === 0 ? (
-                    <div style={{ gridColumn: "1/-1", padding: "40px 20px", textAlign: "center" }}><div className="t-h3" style={{ color: "var(--text-2)" }}>Операций пока нет</div><div className="t-body-s muted" style={{ marginTop: 6 }}>Баланс формируется из расчётов по рейсам.</div></div>
-                  ) : L.map((e, i) => (
-                    <div className="table__row" key={i}>
-                      <div className="table__td table__td--mono">{fmtDate(e.date)}</div>
-                      <div className="table__td"><span className={`dot dot--${opDot(e.entry_type)}`} />{TX_LABELS[e.entry_type] || e.entry_type}</div>
-                      <div className="table__td table__td--num" style={{ color: e.amount > 0 ? "var(--success-strong)" : e.entry_type.includes("fine") ? "var(--danger)" : "var(--ink)" }}>{e.amount > 0 ? "+" : ""}{money(e.amount)}</div>
-                      <div className="table__td muted">{e.description || "—"}</div>
+            {ledger === null ? (
+              <div className="t-body-s muted" style={{ padding: "24px 4px", color: "var(--text-3)" }}>Загрузка…</div>
+            ) : L.length === 0 ? (
+              <div style={{ padding: "40px 20px", textAlign: "center" }}><div className="t-h3" style={{ color: "var(--text-2)" }}>Операций пока нет</div><div className="t-body-s muted" style={{ marginTop: 6 }}>Баланс формируется из расчётов по рейсам.</div></div>
+            ) : isPhone ? (
+              <div className="oplist">
+                {L.map((e, i) => (
+                  <div className="oplist__row" key={i}>
+                    <div className="oplist__main">
+                      <span className={`dot dot--${opDot(e.entry_type)}`} />
+                      <span className="oplist__op">{TX_LABELS[e.entry_type] || e.entry_type}</span>
+                      <span className="oplist__amount" style={{ color: e.amount > 0 ? "var(--success-strong)" : e.entry_type.includes("fine") ? "var(--danger)" : "var(--ink)" }}>{e.amount > 0 ? "+" : ""}{money(e.amount)}</span>
                     </div>
-                  ))}
+                    <div className="oplist__meta"><span>{fmtDate(e.date)}</span>{e.description ? <span>· {e.description}</span> : null}</div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="table-card" style={{ flex: 1, minHeight: 0 }}>
+                <div className="table-scroll">
+                  <div className="table" style={{ gridTemplateColumns: "110px 1fr 140px minmax(220px, 1.4fr)" }}>
+                    <div className="table__head">
+                      <button className="table__th">Дата</button>
+                      <button className="table__th">Операция</button>
+                      <button className="table__th" style={{ justifyContent: "flex-end" }}>Сумма</button>
+                      <button className="table__th">Комментарий</button>
+                    </div>
+                    {L.map((e, i) => (
+                      <div className="table__row" key={i}>
+                        <div className="table__td table__td--mono">{fmtDate(e.date)}</div>
+                        <div className="table__td"><span className={`dot dot--${opDot(e.entry_type)}`} />{TX_LABELS[e.entry_type] || e.entry_type}</div>
+                        <div className="table__td table__td--num" style={{ color: e.amount > 0 ? "var(--success-strong)" : e.entry_type.includes("fine") ? "var(--danger)" : "var(--ink)" }}>{e.amount > 0 ? "+" : ""}{money(e.amount)}</div>
+                        <div className="table__td muted">{e.description || "—"}</div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </NdModal>
         );
       })()}

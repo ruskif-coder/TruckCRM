@@ -17,9 +17,11 @@ import NdSectionTabs, { REPORTS_TABS } from "./NdSectionTabs";
 import NdMultiSelect from "./NdMultiSelect";
 import NdDateRange from "./NdDateRange";
 import NdSortReset from "./NdSortReset";
+import NdFilters, { NdFilterButton } from "./NdFilters";
+import NdPhoneHead from "./NdPhoneHead";
 import NdDataTable from "./NdDataTable";
 import type { Column } from "./NdDataTable";
-import { shortDate as sd, NdSearch } from "./shared";
+import { shortDate as sd, NdSearch, useIsPhone } from "./shared";
 import "./newdash.css";
 
 type FlatRow = WeeklyRow & { week_start: string; week_end: string; id: string };
@@ -44,6 +46,13 @@ export default function NewDashReports() {
 
   const [sorted, setSorted] = useState(false);
   const resetSortRef = useRef<() => void>(() => {});
+  const isPhone = useIsPhone();
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const activeCount = (carrierF.size ? 1 : 0) + (truckF.size ? 1 : 0) + (driverF.size ? 1 : 0) + (sorted ? 1 : 0);
+  const resetAllFilters = () => {
+    setCarrierF(new Set()); setTruckF(new Set()); setDriverF(new Set());
+    resetSortRef.current();
+  };
 
   // По умолчанию — последние 5 недель (как в оригинале Reports.tsx).
   const [{ dateFrom: initFrom, dateTo: initTo }] = useState(() => lastNWeeksRange(5));
@@ -127,51 +136,75 @@ export default function NewDashReports() {
     <div className="nd">
       <NdMenu active="reports" />
       <main className="main" data-pad="wide">
-        <header className="topbar">
-          <div className="topbar__title">
-            <h1 className="t-h1" style={{ margin: 0 }}>Отчёты</h1>
-            <span className="t-mono muted">расчёт по неделям</span>
-          </div>
-          <div className="spacer" />
-          <NdSearch value={q} onChange={setQ} placeholder="Перевозчик, машина, водитель…" />
-        </header>
-
-        <NdSectionTabs tabs={REPORTS_TABS} right={<>
-          <span className="segments">
-            <button className="segments__item" aria-selected={view === "full"} onClick={() => setView("full")}>Полный</button>
-            <button className="segments__item" aria-selected={view === "driver"} onClick={() => setView("driver")}>Для водителя</button>
-          </span>
-          <button className="btn btn--ghost" onClick={() => setDense(d => !d)}>{dense ? "Обычно" : "Компактно"}</button>
-        </>} />
+        {isPhone ? (
+          <>
+            <NdPhoneHead title="Отчёты" subtitle="расчёт по неделям" />
+            <NdSectionTabs tabs={REPORTS_TABS} />
+            <div className="nd-searchrow">
+              <NdSearch value={q} onChange={setQ} placeholder="Перевозчик, машина, водитель…" />
+              <NdFilterButton count={activeCount} onClick={() => setFiltersOpen(true)} />
+            </div>
+          </>
+        ) : (
+          <>
+            <header className="topbar">
+              <div className="topbar__title">
+                <h1 className="t-h1" style={{ margin: 0 }}>Отчёты</h1>
+                <span className="t-mono muted">расчёт по неделям</span>
+              </div>
+              <div className="spacer" />
+              <NdSearch value={q} onChange={setQ} placeholder="Перевозчик, машина, водитель…" />
+            </header>
+            <NdSectionTabs tabs={REPORTS_TABS} right={<>
+              <span className="segments">
+                <button className="segments__item" aria-selected={view === "full"} onClick={() => setView("full")}>Полный</button>
+                <button className="segments__item" aria-selected={view === "driver"} onClick={() => setView("driver")}>Для водителя</button>
+              </span>
+              <button className="btn btn--ghost" onClick={() => setDense(d => !d)}>{dense ? "Обычно" : "Компактно"}</button>
+            </>} />
+          </>
+        )}
 
         <div className="summarystrip">
-          <div className="summary"><div className="summary__label">Строк в выборке</div><div className="summary__value">{loading ? "…" : rows.length}</div></div>
+          {!isPhone && <div className="summary"><div className="summary__label">Строк в выборке</div><div className="summary__value">{loading ? "…" : rows.length}</div></div>}
           <div className="summary"><div className="summary__label">Рейсов</div><div className="summary__value">{loading ? "…" : t.trips}</div></div>
-          {view === "full" && <div className="summary"><div className="summary__label">Выручка</div><div className="summary__value">{loading ? "…" : money(t.gross)}</div></div>}
+          {(view === "full" || isPhone) && <div className="summary"><div className="summary__label">Выручка</div><div className="summary__value">{loading ? "…" : money(t.gross)}</div></div>}
           <div className="summary"><div className="summary__label">Netto (после СК)</div><div className="summary__value">{loading ? "…" : money(t.net)}</div></div>
           <div className="summary"><div className="summary__label">Штрафы</div><div className="summary__value neg">{loading ? "…" : money(t.fines)}</div></div>
-          {view === "full" && <div className="summary"><div className="summary__label">Прибыль</div><div className={"summary__value" + (t.profit < 0 ? " neg" : "")}>{loading ? "…" : money(t.profit)}</div></div>}
+          {(view === "full" || isPhone) && <div className="summary"><div className="summary__label">Прибыль</div><div className={"summary__value" + (t.profit < 0 ? " neg" : "")}>{loading ? "…" : money(t.profit)}</div></div>}
         </div>
 
-        <div className="filterbar">
+        <NdFilters open={filtersOpen} onClose={() => setFiltersOpen(false)} onReset={resetAllFilters} section="Отчёты">
           <NdDateRange from={dateFrom} to={dateTo} onFrom={setDateFrom} onTo={setDateTo} />
           <NdMultiSelect label="Перевозчик" options={carrierOptions} selected={carrierF} onChange={setCarrierF} />
           <NdMultiSelect label="Машина" options={truckOptions} selected={truckF} onChange={setTruckF} />
           <NdMultiSelect label="Водитель" options={driverOptions} selected={driverF} onChange={setDriverF} />
           <NdSortReset active={sorted} onReset={() => resetSortRef.current()} />
-        </div>
+        </NdFilters>
 
         {data && data.notes.length > 0 && (
-          <div style={{ margin: "10px 32px 0" }} className="act-warn">
+          <div className="act-warn nd-pgnote">
             <span className="dot dot--warn" />{data.notes.join(" · ")}
           </div>
         )}
 
-        <div className="rpt-table" style={{ flex: 1, minHeight: 0, padding: "12px 32px 20px", display: "flex", flexDirection: "column" }}>
+        <div className={isPhone ? "nd-listwrap" : "rpt-table"} style={isPhone ? undefined : { flex: 1, minHeight: 0, padding: "12px 32px 20px", display: "flex", flexDirection: "column" }}>
           <NdDataTable<FlatRow>
             columns={columns} rows={rows} loading={loading} dense={dense} totals
             onSortActive={setSorted} resetRef={resetSortRef}
             sortKey="week_start" sortDir={1} rowId={r => r.id}
+            card={r => ({
+              title: r.truck_label || "—",
+              subtitle: `${sd(r.week_start)} – ${sd(r.week_end)} · ${r.trips} рейс.`,
+              right: <><div style={{ fontFamily: "var(--font-mono)", fontWeight: 600, color: r.profit >= 0 ? "var(--success-strong)" : "var(--danger)" }}>{money(r.profit)}</div><div className="t-mono-label" style={{ textAlign: "right", marginTop: 2 }}>прибыль</div></>,
+              collapsible: true,
+              facts: [
+                { label: "Водитель", value: r.driver_label || "—" },
+                { label: "Выручка", value: money(r.gross) },
+                { label: "Netto", value: money(r.net) },
+                { label: "Рентаб.", value: pctFrac(r.profitability) },
+              ],
+            })}
             empty={error ? "Не удалось загрузить отчёт" : "Нет данных за период"}
             emptyHint={error ? "Проверьте доступ и повторите" : "Смягчите фильтры или расширьте период"}
             onRowClick={r => {

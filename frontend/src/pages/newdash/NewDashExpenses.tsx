@@ -12,10 +12,11 @@ import NdMultiSelect from "./NdMultiSelect";
 import NdDateRange from "./NdDateRange";
 import NdSortReset from "./NdSortReset";
 import NdFilters, { NdFilterButton } from "./NdFilters";
+import NdPhoneHead from "./NdPhoneHead";
 import NdModal from "./NdModal";
 import NdDataTable from "./NdDataTable";
 import type { Column } from "./NdDataTable";
-import { NdSearch } from "./shared";
+import { NdSearch, useIsPhone } from "./shared";
 import "./newdash.css";
 
 type Entry = {
@@ -55,6 +56,7 @@ export default function NewDashExpenses() {
   const [bankF, setBankF] = useState<Set<string>>(new Set());
   const [catF, setCatF] = useState<Set<string>>(new Set());
   const [filtersOpen, setFiltersOpen] = useState(false);   // моб. лист фильтров
+  const isPhone = useIsPhone();
   const [sorted, setSorted] = useState(false);
   const resetSortRef = useRef<() => void>(() => {});
   const activeCount = (statusF.size ? 1 : 0) + (bankF.size ? 1 : 0) + (catF.size ? 1 : 0) + (sorted ? 1 : 0);
@@ -141,23 +143,41 @@ export default function NewDashExpenses() {
     <div className="nd">
       <NdMenu active="finance" />
       <main className="main">
-        <header className="topbar">
-          <div className="topbar__title"><h1 className="t-h1" style={{ margin: 0 }}>Реестр расходов</h1><span className="t-mono muted">операций · {entries.length}</span></div>
-          <div className="spacer" />
-          <NdSearch value={q} onChange={setQ} placeholder="Статья, контрагент, назначение…" />
-          <NdFilterButton count={activeCount} onClick={() => setFiltersOpen(true)} />
-        </header>
-
-        <NdSectionTabs tabs={FINANCE_TABS} right={<>
-          <button className="btn btn--ghost" onClick={() => setDense(d => !d)}>{dense ? "Обычно" : "Компактно"}</button>
-          <button className="btn btn--accent" onClick={openCreate}>Добавить</button>
-        </>} />
-
-        <div className="summarystrip">
-          <div className="summary"><div className="summary__label">Операций в выборке</div><div className="summary__value">{loading ? "…" : rows.length}</div></div>
-          <div className="summary"><div className="summary__label">Расход по выборке</div><div className="summary__value neg">{loading ? "…" : money(totalExpense)}</div></div>
-          <div className="summary"><div className="summary__label">Доход по выборке</div><div className="summary__value" style={{ color: "var(--success-strong)" }}>{loading ? "…" : money(totalIncome)}</div></div>
-        </div>
+        {isPhone ? (
+          <>
+            <NdPhoneHead title="Реестр расходов" subtitle={`операций · ${entries.length}`} onAdd={openCreate} />
+            <NdSectionTabs tabs={FINANCE_TABS} />
+            <div className="nd-searchrow">
+              <NdSearch value={q} onChange={setQ} placeholder="Статья, контрагент, назначение…" />
+              <NdFilterButton count={activeCount} onClick={() => setFiltersOpen(true)} />
+            </div>
+            <div className="nd-saldo">
+              <div className="nd-saldo__top"><span className="nd-saldo__cap">Сальдо · выборка</span></div>
+              <div className="nd-saldo__value">{loading ? "…" : money(totalIncome - totalExpense)}</div>
+              <div className="nd-saldo__row">
+                <div><div className="nd-saldo__lbl">Доход</div><div className="nd-saldo__sub">{money(totalIncome)}</div></div>
+                <div><div className="nd-saldo__lbl">Расход</div><div className="nd-saldo__sub">{money(totalExpense)}</div></div>
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <header className="topbar">
+              <div className="topbar__title"><h1 className="t-h1" style={{ margin: 0 }}>Реестр расходов</h1><span className="t-mono muted">операций · {entries.length}</span></div>
+              <div className="spacer" />
+              <NdSearch value={q} onChange={setQ} placeholder="Статья, контрагент, назначение…" />
+            </header>
+            <NdSectionTabs tabs={FINANCE_TABS} right={<>
+              <button className="btn btn--ghost" onClick={() => setDense(d => !d)}>{dense ? "Обычно" : "Компактно"}</button>
+              <button className="btn btn--accent" onClick={openCreate}>Добавить</button>
+            </>} />
+            <div className="summarystrip">
+              <div className="summary"><div className="summary__label">Операций в выборке</div><div className="summary__value">{loading ? "…" : rows.length}</div></div>
+              <div className="summary"><div className="summary__label">Расход по выборке</div><div className="summary__value neg">{loading ? "…" : money(totalExpense)}</div></div>
+              <div className="summary"><div className="summary__label">Доход по выборке</div><div className="summary__value" style={{ color: "var(--success-strong)" }}>{loading ? "…" : money(totalIncome)}</div></div>
+            </div>
+          </>
+        )}
 
         <NdFilters open={filtersOpen} onClose={() => setFiltersOpen(false)} onReset={resetAllFilters} section="Финансы">
           <NdDateRange from={dateFrom} to={dateTo} onFrom={setDateFrom} onTo={setDateTo} />
@@ -167,12 +187,28 @@ export default function NewDashExpenses() {
           <NdSortReset active={sorted} onReset={() => resetSortRef.current()} />
         </NdFilters>
 
-        <div style={{ flex: 1, minHeight: 0, padding: "12px 24px 20px", display: "flex", flexDirection: "column" }}>
+        <div className={isPhone ? "nd-listwrap" : undefined} style={isPhone ? undefined : { flex: 1, minHeight: 0, padding: "12px 24px 20px", display: "flex", flexDirection: "column" }}>
           <NdDataTable<Row>
             columns={columns} rows={rows} loading={loading} dense={dense} select totals
             onSortActive={setSorted} resetRef={resetSortRef}
             sortKey="date" sortDir={-1} rowId={r => r.id}
             onRowClick={r => openEdit(r)}
+            card={r => ({
+              title: r.category || "Операция",
+              subtitle: fmtDate(r.date),
+              right: r.income > 0
+                ? <div style={{ fontFamily: "var(--font-mono)", fontWeight: 600, color: "var(--success-strong)" }}>+{money(r.income)}</div>
+                : <div style={{ fontFamily: "var(--font-mono)", fontWeight: 600, color: "var(--danger)" }}>−{money(r.expense)}</div>,
+              collapsible: true,
+              facts: [
+                { label: "Статус", value: <span className={`status status--${statusTone(r.status)}`}>{r.status}</span> },
+                { label: "Банк", value: r.bank || "—" },
+                { label: "Контрагент", value: r.counterparty || "—" },
+                { label: "Назначение", value: r.purpose || "—" },
+                { label: "Машина", value: r.truck || "—" },
+                { label: "Водитель", value: r.driver || "—" },
+              ],
+            })}
             empty={error ? "Не удалось загрузить" : "Операций нет"} emptyHint={error ? "Проверьте доступ" : "Смягчите фильтры или добавьте операцию"}
             bulkActions={[{ label: "Удалить", onClick: async (ids, tapi) => { if (!window.confirm(`Удалить ${ids.length} операц.?`)) return; let done = 0; for (const id of ids) { try { await api.delete(`/api/expenses/${id}`); done++; } catch { /* продолжаем, ошибку покажем ниже */ } } tapi.clearSelection(); loadAll(); if (done < ids.length) window.alert(`Удалено ${done} из ${ids.length}. Часть операций удалить не удалось — попробуйте ещё раз.`); } }]}
           />

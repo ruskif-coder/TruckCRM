@@ -15,7 +15,8 @@ import { pct, type WeeklyData } from "../../lib/weekly";
 import { lastNWeeksRange } from "../../components/DateRangePicker";
 import { useAuth } from "../../auth/AuthContext";
 import NdMenu from "./NdMenu";
-import { shortDate, startDrag } from "./shared";
+import NdPhoneHead from "./NdPhoneHead";
+import { shortDate, startDrag, useIsPhone } from "./shared";
 import "./newdash.css";
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -270,6 +271,7 @@ type Comment = { author: string; when: string; text: string };
 export default function NewDash() {
   const { user } = useAuth();
 
+  const isPhone = useIsPhone();
   const [metric, setMetric] = useState<MetricKey>("trips");
   const [boardSpan, setBoardSpan] = useState(9);    // окно табло: 9/12/18/24 ч
 
@@ -737,24 +739,28 @@ export default function NewDash() {
 
       <main className="main">
         {/* ═══ Шапка ═══ */}
-        <header className="topbar">
-          <div className="topbar__title">
-            <h1 className="t-h1" style={{ margin: 0 }}>Рабочий стол</h1>
-            <span className="t-mono muted">пн, 6 авг · нед. 32</span>
-          </div>
-          <div className="spacer" />
+        {isPhone ? (
+          <NdPhoneHead title="Рабочий стол" subtitle="пн, 6 авг · нед. 32" />
+        ) : (
+          <header className="topbar">
+            <div className="topbar__title">
+              <h1 className="t-h1" style={{ margin: 0 }}>Рабочий стол</h1>
+              <span className="t-mono muted">пн, 6 авг · нед. 32</span>
+            </div>
+            <div className="spacer" />
 
-          <div className="search">
-            <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round"><circle cx="6.2" cy="6.2" r="4.2" /><path d="M9.4 9.4 12.6 12.6" /></svg>
-            <span>Рейс, машина, водитель…</span>
-            <span className="search__hint">⌘K</span>
-          </div>
+            <div className="search">
+              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round"><circle cx="6.2" cy="6.2" r="4.2" /><path d="M9.4 9.4 12.6 12.6" /></svg>
+              <span>Рейс, машина, водитель…</span>
+              <span className="search__hint">⌘K</span>
+            </div>
 
-          <button className={editing ? "btn btn--accent" : "btn btn--ghost"} onClick={() => setEditing(e => !e)}>
-            <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round"><rect x="1.5" y="1.5" width="10" height="10" rx="2" /><path d="M8 4.5v6" /></svg>
-            <span>{editing ? "Готово" : "Настроить стол"}</span>
-          </button>
-        </header>
+            <button className={editing ? "btn btn--accent" : "btn btn--ghost"} onClick={() => setEditing(e => !e)}>
+              <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round"><rect x="1.5" y="1.5" width="10" height="10" rx="2" /><path d="M8 4.5v6" /></svg>
+              <span>{editing ? "Готово" : "Настроить стол"}</span>
+            </button>
+          </header>
+        )}
 
         <div className="contentrow">
           {/* ═══ Сетка виджетов ═══ */}

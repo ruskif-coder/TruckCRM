@@ -22,33 +22,26 @@ const BellIcon = (
 
 const svgProps = { width: 18, height: 18, fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
 
-// «Ещё» — пятый таб нижнего таб-бара на телефоне (открывает лист снизу).
-const MoreIcon = (
-  <svg {...svgProps}><circle cx="4" cy="9" r="1.4" /><circle cx="9" cy="9" r="1.4" /><circle cx="14" cy="9" r="1.4" /></svg>
-);
-// Разделы нижнего таб-бара (телефон): 4 основных + «Ещё». Остальное — в лист.
-const PHONE_PRIMARY: NavKey[] = ["desk", "trips", "cars", "finance"];
-const PHONE_MORE: NavKey[] = ["drivers", "refs", "reports", "repair", "settings"];
-
 export type NavKey = "desk" | "trips" | "cars" | "drivers" | "refs" | "finance" | "repair" | "reports" | "settings";
-type Child = { label: string; to: string };
-type Item = { key: NavKey; label: string; to: string; icon: ReactNode; badge?: number; children?: Child[] };
+export type NavChild = { label: string; to: string };
+export type NavItem = { key: NavKey; label: string; hint?: string; to: string; icon: ReactNode; badge?: number; children?: NavChild[] };
+type Item = NavItem;
 
-const NAV: Item[] = [
-  { key: "desk", label: "Рабочий стол", to: "/newdash", icon: <svg {...svgProps}><rect x="2.5" y="2.5" width="5.5" height="5.5" rx="1.5" /><rect x="10" y="2.5" width="5.5" height="5.5" rx="1.5" /><rect x="2.5" y="10" width="5.5" height="5.5" rx="1.5" /><rect x="10" y="10" width="5.5" height="5.5" rx="1.5" /></svg> },
+export const NAV: NavItem[] = [
+  { key: "desk", label: "Рабочий стол", hint: "Смена, рейсы и внимание", to: "/newdash", icon: <svg {...svgProps}><rect x="2.5" y="2.5" width="5.5" height="5.5" rx="1.5" /><rect x="10" y="2.5" width="5.5" height="5.5" rx="1.5" /><rect x="2.5" y="10" width="5.5" height="5.5" rx="1.5" /><rect x="10" y="10" width="5.5" height="5.5" rx="1.5" /></svg> },
   {
-    key: "trips", label: "Рейсы", to: "/newdash/trips",
+    key: "trips", label: "Рейсы", hint: "Реестр, пробеги, акты", to: "/newdash/trips",
     icon: <svg {...svgProps}><circle cx="4" cy="14" r="2" /><circle cx="14" cy="4" r="2" /><path d="M4 12V9a4 4 0 0 1 4-4h4" /></svg>,
     children: [
-      { label: "Рейсы", to: "/newdash/trips" },
+      { label: "Реестр поездок", to: "/newdash/trips" },
       { label: "Пробеги", to: "/newdash/trips/mileage" },
-      { label: "Акты ПП ТС", to: "/newdash/trips/acts" },
+      { label: "Приёмка-сдача", to: "/newdash/trips/acts" },
     ],
   },
-  { key: "cars", label: "Машины", to: "/newdash/cars", icon: <svg {...svgProps}><path d="M1.5 4.5h8v8h-8z" /><path d="M9.5 7.5h3l3 3v2h-6z" /><circle cx="5" cy="14" r="1.6" /><circle cx="12.8" cy="14" r="1.6" /></svg> },
-  { key: "drivers", label: "Водители", to: "/newdash/drivers", icon: <svg {...svgProps}><circle cx="9" cy="6" r="3" /><path d="M3.5 15.5c0-3 2.5-4.5 5.5-4.5s5.5 1.5 5.5 4.5" /></svg> },
+  { key: "cars", label: "Машины", hint: "Парк, документы, ТО", to: "/newdash/cars", icon: <svg {...svgProps}><path d="M1.5 4.5h8v8h-8z" /><path d="M9.5 7.5h3l3 3v2h-6z" /><circle cx="5" cy="14" r="1.6" /><circle cx="12.8" cy="14" r="1.6" /></svg> },
+  { key: "drivers", label: "Водители", hint: "Штат, балансы, анкеты", to: "/newdash/drivers", icon: <svg {...svgProps}><circle cx="9" cy="6" r="3" /><path d="M3.5 15.5c0-3 2.5-4.5 5.5-4.5s5.5 1.5 5.5 4.5" /></svg> },
   {
-    key: "refs", label: "Справочники", to: "/newdash/refs",
+    key: "refs", label: "Справочники", hint: "Перевозчики, контрагенты", to: "/newdash/refs",
     icon: <svg {...svgProps}><path d="M4 2.5h7A1.5 1.5 0 0 1 12.5 4v11.5H5.5A1.5 1.5 0 0 1 4 14z" /><path d="M4 12.5h8.5" /><path d="M6.2 5.5h4M6.2 8h4" /></svg>,
     children: [
       { label: "Перевозчики", to: "/newdash/refs" },
@@ -56,7 +49,7 @@ const NAV: Item[] = [
     ],
   },
   {
-    key: "finance", label: "Финансы", to: "/newdash/finance",
+    key: "finance", label: "Финансы", hint: "Расходы, топливо, заявки", to: "/newdash/finance",
     icon: <svg {...svgProps}><rect x="1.5" y="4" width="15" height="10" rx="2" /><circle cx="9" cy="9" r="2.2" /></svg>,
     children: [
       { label: "Реестр расходов", to: "/newdash/finance" },
@@ -65,16 +58,16 @@ const NAV: Item[] = [
     ],
   },
   {
-    key: "reports", label: "Отчёты", to: "/newdash/reports",
+    key: "reports", label: "Отчёты", hint: "P&L, перевозчики", to: "/newdash/reports",
     icon: <svg {...svgProps}><rect x="3" y="2" width="12" height="14" rx="2" /><path d="M6 6h6" /><path d="M6 9h6" /><path d="M6 12h3.5" /></svg>,
     children: [
-      { label: "Отчёты", to: "/newdash/reports" },
+      { label: "P&L по машинам", to: "/newdash/reports" },
       { label: "Перевозчики", to: "/newdash/reports/carriers" },
     ],
   },
-  { key: "repair", label: "Ремонт", to: "/newdash/repair", icon: <svg {...svgProps}><path d="M11.6 2.6a4.2 4.2 0 0 0-5.2 5.2L2.4 11.8v3.8h3.8l4-4a4.2 4.2 0 0 0 5.2-5.2l-2.4 2.4-2.2-.6-.6-2.2z" /></svg> },
+  { key: "repair", label: "Ремонт", hint: "Заявки на ремонт", to: "/newdash/repair", icon: <svg {...svgProps}><path d="M11.6 2.6a4.2 4.2 0 0 0-5.2 5.2L2.4 11.8v3.8h3.8l4-4a4.2 4.2 0 0 0 5.2-5.2l-2.4 2.4-2.2-.6-.6-2.2z" /></svg> },
   {
-    key: "settings", label: "Настройки", to: "/newdash/settings",
+    key: "settings", label: "Настройки", hint: "Профиль, доступ, журнал", to: "/newdash/settings",
     icon: <svg {...svgProps}><path d="M2.5 5h13" /><path d="M2.5 13h13" /><circle cx="6.5" cy="5" r="1.9" /><circle cx="11.5" cy="13" r="1.9" /></svg>,
     children: [
       { label: "Профиль", to: "/newdash/settings" },
@@ -85,6 +78,9 @@ const NAV: Item[] = [
     ],
   },
 ];
+
+// admin-only подпункты «Настроек» (та же логика, что в сайдбаре)
+export const ADMIN_ONLY_PATHS = new Set(["/newdash/settings/users", "/newdash/settings/roles", "/newdash/settings/log", "/newdash/settings/categories"]);
 
 export default function NdMenu({ active }: { active: NavKey }) {
   const navigate = useNavigate();
@@ -97,7 +93,6 @@ export default function NdMenu({ active }: { active: NavKey }) {
   const menuOpen = pinned || hover;
   // Телефон (≤640px): вместо бокового меню — нижний таб-бар + лист «Ещё».
   const [isPhone, setIsPhone] = useState(() => typeof window !== "undefined" && window.matchMedia("(max-width: 640px)").matches);
-  const [moreOpen, setMoreOpen] = useState(false);
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 640px)");
     const on = () => setIsPhone(mq.matches);
@@ -133,56 +128,9 @@ export default function NdMenu({ active }: { active: NavKey }) {
     it.key === active || pathname === it.to || (it.children?.some(c => pathname === c.to) ?? false);
 
   // ── Телефон: нижний таб-бар (4 раздела + «Ещё») и лист «Ещё» снизу ──
-  if (isPhone) {
-    const go = (to: string) => { setMoreOpen(false); navigate(to); };
-    const moreActive = PHONE_MORE.some(k => { const it = NAV.find(n => n.key === k); return it ? sectionActive(it) : false; });
-    return (
-      <>
-        <nav className="nd-tabbar">
-          {PHONE_PRIMARY.map(key => {
-            const it = NAV.find(n => n.key === key)!;
-            const bell = badgeOf(it);
-            return (
-              <button key={key} className="nd-tabbar__item" aria-current={sectionActive(it) ? "page" : undefined} onClick={() => go(it.to)}>
-                <span className="nd-tabbar__icon">{it.icon}{bell ? <span className="nd-tabbar__dot" /> : null}</span>
-                <span className="nd-tabbar__label">{it.label}</span>
-              </button>
-            );
-          })}
-          <button className="nd-tabbar__item" aria-current={moreActive ? "page" : undefined} onClick={() => setMoreOpen(true)}>
-            <span className="nd-tabbar__icon">{MoreIcon}{repairOpen ? <span className="nd-tabbar__dot" /> : null}</span>
-            <span className="nd-tabbar__label">Ещё</span>
-          </button>
-        </nav>
-
-        {moreOpen && (
-          <div className="nd-msheet" onClick={() => setMoreOpen(false)}>
-            <div className="nd-msheet__backdrop" />
-            <div className="nd-msheet__panel" onClick={e => e.stopPropagation()}>
-              <div className="nd-msheet__grip"><i /></div>
-              <div className="nd-msheet__list">
-                {PHONE_MORE.map(key => {
-                  const it = NAV.find(n => n.key === key)!;
-                  const bell = badgeOf(it);
-                  return (
-                    <button key={key} className="nd-msheet__item" aria-current={sectionActive(it) ? "page" : undefined} onClick={() => go(it.to)}>
-                      <span className="nd-msheet__ico">{it.icon}</span>
-                      <span style={{ flex: 1 }}>{it.label}</span>
-                      {bell ? <span className="menu__bell">{BellIcon}<span className="menu__bell-count">{bell > 9 ? "9+" : bell}</span></span> : null}
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="nd-msheet__foot">
-                <button className="nd-msheet__item" onClick={toggleTheme}>{theme === "dark" ? "Светлая тема" : "Тёмная тема"}</button>
-                <button className="nd-msheet__item" onClick={() => { setMoreOpen(false); logout(); navigate("/login", { replace: true }); }}>Выйти</button>
-              </div>
-            </div>
-          </div>
-        )}
-      </>
-    );
-  }
+  // Телефон: боковое меню/таб-бар не рендерим — навигация через бургер шапки
+  // (NdPhoneHead → NdNavSheet, лист «Все разделы»).
+  if (isPhone) return null;
 
   return (
     <div className="menu-slot" data-pinned={pinned}>

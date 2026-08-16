@@ -11,10 +11,12 @@ import NdSectionTabs, { FINANCE_TABS } from "./NdSectionTabs";
 import NdMultiSelect from "./NdMultiSelect";
 import NdDateRange from "./NdDateRange";
 import NdSortReset from "./NdSortReset";
+import NdFilters, { NdFilterButton } from "./NdFilters";
+import NdPhoneHead from "./NdPhoneHead";
 import NdModal from "./NdModal";
 import NdDataTable from "./NdDataTable";
 import type { Column } from "./NdDataTable";
-import { NdSearch } from "./shared";
+import { NdSearch, useIsPhone } from "./shared";
 import "./newdash.css";
 
 type Fuel = { id: number; external_id: string; date: string; station: string; card_number: string; truck_brand_raw: string; plate_raw: string; truck_id: number | null; volume: number; amount: number; external_transaction_id: string };
@@ -36,6 +38,14 @@ export default function NewDashFuel() {
   const [truckF, setTruckF] = useState<Set<string>>(new Set());
   const [sorted, setSorted] = useState(false);
   const resetSortRef = useRef<() => void>(() => {});
+  const isPhone = useIsPhone();
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const activeCount = (stationF.size ? 1 : 0) + (truckF.size ? 1 : 0) + (sorted ? 1 : 0);
+  const resetAllFilters = () => {
+    setStationF(new Set()); setTruckF(new Set());
+    setDateFrom(isoDate(new Date(Date.now() - 60 * 864e5))); setDateTo(isoDate(new Date()));
+    resetSortRef.current();
+  };
 
   const [importOpen, setImportOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -116,18 +126,33 @@ export default function NewDashFuel() {
     <div className="nd">
       <NdMenu active="finance" />
       <main className="main">
-        <header className="topbar">
-          <div className="topbar__title"><h1 className="t-h1" style={{ margin: 0 }}>Топливо</h1><span className="t-mono muted">заправок · {records.length}</span></div>
-          <div className="spacer" />
-          <NdSearch value={q} onChange={setQ} placeholder="Станция, карта, машина…" width={240} />
-        </header>
-
-        <NdSectionTabs tabs={FINANCE_TABS} right={<>
-          <button className="btn btn--ghost" onClick={() => setDense(d => !d)}>{dense ? "Обычно" : "Компактно"}</button>
-          <button className="btn btn--ghost" disabled={posting} onClick={handlePost}>{posting ? "…" : "Провести в расходы"}</button>
-          <button className="btn btn--ghost" onClick={() => { setADate(isoDate(new Date())); setAddOpen(true); }}>Внести</button>
-          <button className="btn btn--accent" onClick={() => { setImportSummary(null); setImportFile(null); setImportOpen(true); }}>Импорт E100</button>
-        </>} />
+        {isPhone ? (
+          <>
+            <NdPhoneHead title="Топливо" subtitle={`заправок · ${records.length}`} onAdd={() => { setADate(isoDate(new Date())); setAddOpen(true); }} />
+            <NdSectionTabs tabs={FINANCE_TABS} />
+            <div className="nd-searchrow">
+              <NdSearch value={q} onChange={setQ} placeholder="Станция, карта, машина…" />
+              <NdFilterButton count={activeCount} onClick={() => setFiltersOpen(true)} />
+              <button type="button" className="nd-searchrow__act" title="Импорт E100" onClick={() => { setImportSummary(null); setImportFile(null); setImportOpen(true); }}>
+                <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round"><path d="M8 1.5v8" /><path d="M4.7 6.2 8 9.5l3.3-3.3" /><path d="M2.4 12.5h11.2" /></svg>
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <header className="topbar">
+              <div className="topbar__title"><h1 className="t-h1" style={{ margin: 0 }}>Топливо</h1><span className="t-mono muted">заправок · {records.length}</span></div>
+              <div className="spacer" />
+              <NdSearch value={q} onChange={setQ} placeholder="Станция, карта, машина…" width={240} />
+            </header>
+            <NdSectionTabs tabs={FINANCE_TABS} right={<>
+              <button className="btn btn--ghost" onClick={() => setDense(d => !d)}>{dense ? "Обычно" : "Компактно"}</button>
+              <button className="btn btn--ghost" disabled={posting} onClick={handlePost}>{posting ? "…" : "Провести в расходы"}</button>
+              <button className="btn btn--ghost" onClick={() => { setADate(isoDate(new Date())); setAddOpen(true); }}>Внести</button>
+              <button className="btn btn--accent" onClick={() => { setImportSummary(null); setImportFile(null); setImportOpen(true); }}>Импорт E100</button>
+            </>} />
+          </>
+        )}
 
         <div className="summarystrip">
           <div className="summary"><div className="summary__label">Заправок в выборке</div><div className="summary__value">{loading ? "…" : rows.length}</div></div>
@@ -137,18 +162,29 @@ export default function NewDashFuel() {
 
         {postSummary && <div style={{ margin: "10px 24px 0" }} className="act-warn"><span className="dot dot--ok" />Проведено: недель {postSummary.weeks}, новых строк в расходах {postSummary.created}</div>}
 
-        <div className="filterbar">
+        <NdFilters open={filtersOpen} onClose={() => setFiltersOpen(false)} onReset={resetAllFilters} section="Топливо">
           <NdDateRange from={dateFrom} to={dateTo} onFrom={setDateFrom} onTo={setDateTo} />
           <NdMultiSelect label="Станция" options={stationOptions} selected={stationF} onChange={setStationF} />
           <NdMultiSelect label="Машина" options={truckOptions} selected={truckF} onChange={setTruckF} />
           <NdSortReset active={sorted} onReset={() => resetSortRef.current()} />
-        </div>
+        </NdFilters>
 
-        <div style={{ flex: 1, minHeight: 0, padding: "12px 24px 20px", display: "flex", flexDirection: "column" }}>
+        <div className={isPhone ? "nd-listwrap" : undefined} style={isPhone ? undefined : { flex: 1, minHeight: 0, padding: "12px 24px 20px", display: "flex", flexDirection: "column" }}>
           <NdDataTable<Row>
             columns={columns} rows={rows} loading={loading} dense={dense} select totals
             onSortActive={setSorted} resetRef={resetSortRef}
             sortKey="date" sortDir={-1} rowId={r => r.id}
+            card={r => ({
+              title: fmtDate((r.date as string || "").slice(0, 10)),
+              right: <div style={{ fontFamily: "var(--font-mono)", fontWeight: 600, color: "var(--danger)" }}>{money(r.amount)}</div>,
+              collapsible: true,
+              facts: [
+                { label: "Литры", value: r.volume ? `${(r.volume as number).toLocaleString("ru-RU")} л` : "—" },
+                { label: "Машина", value: r.truck || "—" },
+                { label: "Станция", value: r.stationLabel || "—" },
+                { label: "Карта", value: r.card_number || "—" },
+              ],
+            })}
             empty={error ? "Не удалось загрузить" : "Заправок нет"} emptyHint={error ? "Проверьте доступ" : "Импортируйте выписку E100 или внесите вручную"}
             bulkActions={[{ label: "Удалить", onClick: async (ids, tapi) => { if (!window.confirm(`Удалить ${ids.length} записей?`)) return; let done = 0; for (const id of ids) { try { await api.delete(`/api/fuel/${id}`); done++; } catch { /* продолжаем, ошибку покажем ниже */ } } tapi.clearSelection(); loadAll(); if (done < ids.length) window.alert(`Удалено ${done} из ${ids.length}. Часть записей удалить не удалось — попробуйте ещё раз.`); } }]}
           />

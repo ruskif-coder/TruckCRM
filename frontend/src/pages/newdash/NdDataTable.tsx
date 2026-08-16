@@ -69,7 +69,7 @@ export type NdDataTableProps<R extends Row = Row> = {
   // Мобильная карточка (≤640px). Не задан → строится автоматически из columns
   // (первая/липкая колонка = заголовок, status-колонка = правый слот, остальные
   // = факты). Задать для точной раскладки конкретного реестра.
-  card?: (r: R) => { title: ReactNode; subtitle?: ReactNode; right?: ReactNode; collapsible?: boolean; facts?: { label: string; value: ReactNode }[] };
+  card?: (r: R) => { avatar?: ReactNode; title: ReactNode; subtitle?: ReactNode; right?: ReactNode; extra?: ReactNode; collapsible?: boolean; facts?: { label: string; value: ReactNode }[]; actions?: ReactNode };
 };
 
 // ── Форматтеры / типы колонок ──────────────────────────────────────────────
@@ -254,10 +254,14 @@ export default function NdDataTable<R extends Row = Row>(props: NdDataTableProps
   const statusCol = columns.find(c => c.type === "status" && c !== primaryCol);
   const factCols = columns.filter(c => c !== primaryCol && c !== statusCol);
   const buildCard = (r: R) => card ? card(r) : {
+    avatar: undefined as ReactNode,
     title: primaryCol ? cellContent(primaryCol, r) : null,
     subtitle: undefined as ReactNode,
     right: statusCol ? cellContent(statusCol, r) : undefined,
+    extra: undefined as ReactNode,
+    collapsible: undefined as boolean | undefined,
     facts: factCols.map(c => ({ label: c.label, value: cellContent(c, r) })),
+    actions: undefined as ReactNode,
   };
 
   return (
@@ -285,7 +289,8 @@ export default function NdDataTable<R extends Row = Row>(props: NdDataTableProps
                   return (
                     <Fragment key={id}>
                       <NdEntityCard
-                        title={spec.title} subtitle={spec.subtitle} right={spec.right} facts={spec.facts}
+                        avatar={spec.avatar} title={spec.title} subtitle={spec.subtitle} right={spec.right}
+                        extra={spec.extra} facts={spec.facts} actions={spec.actions}
                         collapsible={spec.collapsible}
                         clickable={!!(onRowClick || expand)}
                         onClick={() => { if (expand) toggleExpand(id); else onRowClick?.(r, api); }}
@@ -415,19 +420,21 @@ export default function NdDataTable<R extends Row = Row>(props: NdDataTableProps
         <div className="pager">
           <span className="t-body-s muted">показано {view.length ? `${from + 1}–${from + view.length}` : 0} из {sorted.length}</span>
           <span className="spacer" />
-          {!onPerPageChange && <>
+          {!onPerPageChange && <span className="pager__perpage">
             <span className="t-body-s muted-2">строк на странице</span>
             <span className="segments">
               {perPageOptions.map(n => (
                 <button key={n} className="segments__item" style={{ fontFamily: "var(--font-mono)" }} aria-selected={n === perPage} onClick={() => { setPerPage(n); setPage(1); }}>{n}</button>
               ))}
             </span>
-          </>}
-          <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
-            <button className="pager__btn" disabled={curPage === 1} onClick={() => { setPage(p => Math.max(1, p - 1)); setFocusIx(-1); if (scrollRef.current) scrollRef.current.scrollTop = 0; }}>‹</button>
-            <span className="t-mono-500" style={{ padding: "0 6px" }}>{curPage} / {pages}</span>
-            <button className="pager__btn" disabled={curPage === pages} onClick={() => { setPage(p => Math.min(pages, p + 1)); setFocusIx(-1); if (scrollRef.current) scrollRef.current.scrollTop = 0; }}>›</button>
-          </span>
+          </span>}
+          {(pages > 1 || !isPhone) && (
+            <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <button className="pager__btn" disabled={curPage === 1} onClick={() => { setPage(p => Math.max(1, p - 1)); setFocusIx(-1); if (scrollRef.current) scrollRef.current.scrollTop = 0; }}>‹</button>
+              <span className="t-mono-500" style={{ padding: "0 6px" }}>{curPage} / {pages}</span>
+              <button className="pager__btn" disabled={curPage === pages} onClick={() => { setPage(p => Math.min(pages, p + 1)); setFocusIx(-1); if (scrollRef.current) scrollRef.current.scrollTop = 0; }}>›</button>
+            </span>
+          )}
         </div>
       </div>
 

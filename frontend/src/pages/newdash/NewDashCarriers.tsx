@@ -10,9 +10,12 @@ import { money } from "../../lib/format";
 import NdMenu from "./NdMenu";
 import NdSectionTabs, { REPORTS_TABS } from "./NdSectionTabs";
 import NdSortReset from "./NdSortReset";
+import NdFilters, { NdFilterButton } from "./NdFilters";
+import NdPhoneHead from "./NdPhoneHead";
+import NdModal from "./NdModal";
 import NdDataTable from "./NdDataTable";
 import type { Column } from "./NdDataTable";
-import { shortDate as sd, NdSearch } from "./shared";
+import { shortDate as sd, NdSearch, useIsPhone } from "./shared";
 import "./newdash.css";
 
 type CarrierWeek = { week_start: string; week_end: string; trips: number; gross: number; fines: number; net: number };
@@ -33,6 +36,9 @@ export default function NewDashCarriers() {
   const [dense, setDense] = useState(true);
   const [sorted, setSorted] = useState(false);
   const [exporting, setExporting] = useState<string | null>(null);
+  const isPhone = useIsPhone();
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [billingFor, setBillingFor] = useState<CarrierRow | null>(null);   // модалка биллинга по неделям
   async function exportCarrier(name: string) {
     setExporting(name);
     try { await api.download(`/api/carriers/balance/export?carrier=${encodeURIComponent(name)}`, `perevozchik_${name}.xlsx`); }
@@ -94,18 +100,30 @@ export default function NewDashCarriers() {
     <div className="nd">
       <NdMenu active="reports" />
       <main className="main" data-pad="wide">
-        <header className="topbar">
-          <div className="topbar__title">
-            <h1 className="t-h1" style={{ margin: 0 }}>Перевозчики</h1>
-            <span className="t-mono muted">баланс · {all.length}</span>
-          </div>
-          <div className="spacer" />
-          <NdSearch value={q} onChange={setQ} placeholder="Перевозчик, контрагент…" />
-        </header>
-
-        <NdSectionTabs tabs={REPORTS_TABS} right={
-          <button className="btn btn--ghost" onClick={() => setDense(d => !d)}>{dense ? "Обычно" : "Компактно"}</button>
-        } />
+        {isPhone ? (
+          <>
+            <NdPhoneHead title="Перевозчики" subtitle={`баланс · ${all.length}`} />
+            <NdSectionTabs tabs={REPORTS_TABS} />
+            <div className="nd-searchrow">
+              <NdSearch value={q} onChange={setQ} placeholder="Перевозчик, контрагент…" />
+              <NdFilterButton count={sorted ? 1 : 0} onClick={() => setFiltersOpen(true)} />
+            </div>
+          </>
+        ) : (
+          <>
+            <header className="topbar">
+              <div className="topbar__title">
+                <h1 className="t-h1" style={{ margin: 0 }}>Перевозчики</h1>
+                <span className="t-mono muted">баланс · {all.length}</span>
+              </div>
+              <div className="spacer" />
+              <NdSearch value={q} onChange={setQ} placeholder="Перевозчик, контрагент…" />
+            </header>
+            <NdSectionTabs tabs={REPORTS_TABS} right={
+              <button className="btn btn--ghost" onClick={() => setDense(d => !d)}>{dense ? "Обычно" : "Компактно"}</button>
+            } />
+          </>
+        )}
 
         <div className="summarystrip">
           <div className="summary"><div className="summary__label">Перевозчиков</div><div className="summary__value">{loading ? "…" : rows.length}</div></div>
@@ -116,17 +134,40 @@ export default function NewDashCarriers() {
           <div className="summary"><div className="summary__label">Баланс</div><div className={"summary__value" + (t.balance > 0 ? " neg" : "")}>{loading ? "…" : money(t.balance)}</div></div>
         </div>
 
-        <div className="filterbar">
-          <span className="t-body-s muted">Клик по строке — детализация по неделям. Красный баланс — нам должны, зелёный — переплата.</span>
-          <div className="spacer" />
-          <NdSortReset active={sorted} onReset={() => resetSortRef.current()} />
-        </div>
+        {isPhone ? (
+          <NdFilters open={filtersOpen} onClose={() => setFiltersOpen(false)} onReset={() => resetSortRef.current()} section="Перевозчики">
+            <NdSortReset active={sorted} onReset={() => resetSortRef.current()} />
+          </NdFilters>
+        ) : (
+          <div className="filterbar">
+            <span className="t-body-s muted">Клик по строке — детализация по неделям. Красный баланс — нам должны, зелёный — переплата.</span>
+            <div className="spacer" />
+            <NdSortReset active={sorted} onReset={() => resetSortRef.current()} />
+          </div>
+        )}
 
-        <div className="rpt-table" style={{ flex: 1, minHeight: 0, padding: "12px 32px 20px", display: "flex", flexDirection: "column" }}>
+        <div className={isPhone ? "nd-listwrap" : "rpt-table"} style={isPhone ? undefined : { flex: 1, minHeight: 0, padding: "12px 32px 20px", display: "flex", flexDirection: "column" }}>
           <NdDataTable<CarrierRow>
             columns={columns} rows={rows} loading={loading} dense={dense} totals
             onSortActive={setSorted} resetRef={resetSortRef}
             sortKey="balance" sortDir={-1} rowId={r => r.carrier_id ?? r.carrier_name}
+            card={r => ({
+              title: r.carrier_name,
+              subtitle: r.counterparty_name || undefined,
+              right: <><div style={{ fontFamily: "var(--font-mono)", fontWeight: 600, color: r.balance > 0 ? "var(--danger)" : r.balance < 0 ? "var(--success-strong)" : undefined }}>{money(r.balance)}</div><div className="t-mono-label" style={{ textAlign: "right", marginTop: 2 }}>баланс</div></>,
+              collapsible: true,
+              facts: [
+                { label: "Рейсов", value: r.trips },
+                { label: "Брутто", value: money(r.gross) },
+                { label: "Штрафы", value: r.fines ? money(r.fines) : "—" },
+                { label: "Netto", value: money(r.net) },
+                { label: "Оплачено", value: r.paid > 0 ? money(r.paid) : "—" },
+              ],
+              actions: <>
+                <button type="button" className="btn btn--primary" style={{ flex: 1 }} onClick={() => setBillingFor(r)}>Биллинг</button>
+                <button type="button" className="btn btn--ghost" style={{ flex: 1 }} disabled={exporting === r.carrier_name} onClick={() => exportCarrier(r.carrier_name)}>Excel</button>
+              </>,
+            })}
             empty={error ? "Не удалось загрузить" : "Рейсов с перевозчиком нет"}
             emptyHint={error ? "Проверьте доступ и повторите" : "Укажите перевозчика в рейсах"}
             expand={r => (
@@ -152,6 +193,36 @@ export default function NewDashCarriers() {
           />
         </div>
       </main>
+
+      {billingFor && (
+        <NdModal size="sheet" title={billingFor.carrier_name}
+          subtitle={`Биллинг по неделям · баланс ${money(billingFor.balance)}`}
+          onClose={() => setBillingFor(null)}
+          actions={[
+            { label: "Выгрузить в Excel", kind: "ghost", onClick: () => exportCarrier(billingFor.carrier_name) },
+            { label: "Закрыть", kind: "primary", grow: true, onClick: () => setBillingFor(null) },
+          ]}>
+          <div className="bill-week bill-week--head">
+            <span>Неделя</span><span>Рейсов</span><span>Брутто</span><span>Штрафы</span><span>Netto</span>
+          </div>
+          {billingFor.weeks.length === 0 ? (
+            <div className="t-body-s muted" style={{ padding: "16px 0", textAlign: "center" }}>Нет данных по неделям</div>
+          ) : billingFor.weeks.map(w => (
+            <div className="bill-week" key={w.week_start}>
+              <span className="bill-week__period">{sd(w.week_start)} – {sd(w.week_end)}</span>
+              <span>{w.trips}</span>
+              <span>{money(w.gross)}</span>
+              <span style={{ color: w.fines ? "var(--danger)" : "var(--text-3)" }}>{w.fines ? money(w.fines) : "—"}</span>
+              <span className="bill-week__net">{money(w.net)}</span>
+            </div>
+          ))}
+          <div className="bill-week bill-week--total">
+            <span>ИТОГО</span><span>{billingFor.trips}</span><span>{money(billingFor.gross)}</span>
+            <span style={{ color: billingFor.fines ? "var(--danger)" : "var(--text-3)" }}>{billingFor.fines ? money(billingFor.fines) : "—"}</span>
+            <span className="bill-week__net">{money(billingFor.net)}</span>
+          </div>
+        </NdModal>
+      )}
     </div>
   );
 }

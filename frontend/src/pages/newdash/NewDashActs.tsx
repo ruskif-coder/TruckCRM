@@ -161,6 +161,7 @@ export default function NewDashActs() {
                 { label: "Водитель", value: r.driver_name || "—" },
                 { label: "Завершена", value: r.ended_at ? fmtDateTime(r.ended_at) : "—" },
               ],
+              actions: <button type="button" className="btn btn--primary" style={{ width: "100%" }} onClick={() => setViewId(r.id)}>Посмотреть акт</button>,
             })}
             onSortActive={setSorted}
             resetRef={resetSortRef}

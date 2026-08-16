@@ -9,10 +9,12 @@ import { api, ApiError } from "../../api";
 import NdMenu from "./NdMenu";
 import NdSectionTabs, { REFS_TABS } from "./NdSectionTabs";
 import NdSortReset from "./NdSortReset";
+import NdFilters, { NdFilterButton } from "./NdFilters";
+import NdPhoneHead from "./NdPhoneHead";
 import NdModal from "./NdModal";
 import NdDataTable from "./NdDataTable";
 import type { Column } from "./NdDataTable";
-import { NdField, NdSearch } from "./shared";
+import { NdField, NdSearch, useIsPhone } from "./shared";
 import "./newdash.css";
 
 type Carrier = {
@@ -54,6 +56,8 @@ export default function NewDashRefCarriers() {
   const [dense, setDense] = useState(true);
   const [sorted, setSorted] = useState(false);
   const resetSortRef = useRef<() => void>(() => {});
+  const isPhone = useIsPhone();
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const [editId, setEditId] = useState<number | null>(null);   // null закрыто, 0 новый, >0 правка
   const [form, setForm] = useState<FS>(EMPTY);
@@ -116,29 +120,53 @@ export default function NewDashRefCarriers() {
     <div className="nd">
       <NdMenu active="refs" />
       <main className="main">
-        <header className="topbar">
-          <div className="topbar__title">
-            <h1 className="t-h1" style={{ margin: 0 }}>Перевозчики</h1>
-            <span className="t-mono muted">справочник · {carriers.length}</span>
-          </div>
-          <div className="spacer" />
-          <NdSearch value={q} onChange={setQ} placeholder="Название, ИНН, телефон…" />
-        </header>
+        {isPhone ? (
+          <>
+            <NdPhoneHead title="Перевозчики" subtitle={`справочник · ${carriers.length}`} onAdd={openCreate} />
+            <NdSectionTabs tabs={REFS_TABS} />
+            <div className="nd-searchrow">
+              <NdSearch value={q} onChange={setQ} placeholder="Название, ИНН, телефон…" />
+              <NdFilterButton count={sorted ? 1 : 0} onClick={() => setFiltersOpen(true)} />
+            </div>
+          </>
+        ) : (
+          <>
+            <header className="topbar">
+              <div className="topbar__title">
+                <h1 className="t-h1" style={{ margin: 0 }}>Перевозчики</h1>
+                <span className="t-mono muted">справочник · {carriers.length}</span>
+              </div>
+              <div className="spacer" />
+              <NdSearch value={q} onChange={setQ} placeholder="Название, ИНН, телефон…" />
+            </header>
+            <NdSectionTabs tabs={REFS_TABS} right={<>
+              <button className="btn btn--ghost" onClick={() => setDense(d => !d)}>{dense ? "Обычно" : "Компактно"}</button>
+              <button className="btn btn--accent" onClick={openCreate}>Добавить перевозчика</button>
+            </>} />
+          </>
+        )}
 
-        <NdSectionTabs tabs={REFS_TABS} right={<>
-          <button className="btn btn--ghost" onClick={() => setDense(d => !d)}>{dense ? "Обычно" : "Компактно"}</button>
-          <button className="btn btn--accent" onClick={openCreate}>Добавить перевозчика</button>
-        </>} />
-
-        <div className="filterbar">
+        <NdFilters open={filtersOpen} onClose={() => setFiltersOpen(false)} onReset={() => resetSortRef.current()} section="Перевозчики">
           <NdSortReset active={sorted} onReset={() => resetSortRef.current()} />
-        </div>
+        </NdFilters>
 
-        <div style={{ flex: 1, minHeight: 0, padding: "12px 24px 20px", display: "flex", flexDirection: "column" }}>
+        <div className={isPhone ? "nd-listwrap" : undefined} style={isPhone ? undefined : { flex: 1, minHeight: 0, padding: "12px 24px 20px", display: "flex", flexDirection: "column" }}>
           <NdDataTable<Row>
             columns={columns} rows={rows} loading={loading} dense={dense} rowId={r => r.id}
             onSortActive={setSorted} resetRef={resetSortRef}
             sortKey="name" sortDir={1} onRowClick={r => openEdit(r)}
+            card={r => ({
+              title: r.name,
+              subtitle: r.full_name || undefined,
+              collapsible: true,
+              facts: [
+                { label: "ИНН", value: r.inn || "—" },
+                { label: "Телефон", value: r.phone || "—" },
+                { label: "Контактное лицо", value: r.contact_person || "—" },
+                { label: "% СК", value: r.insurance_pct ? `${r.insurance_pct}%` : "—" },
+                { label: "Контрагент", value: r.cpName || "—" },
+              ],
+            })}
             empty={error ? "Не удалось загрузить" : "Перевозчиков нет"}
             emptyHint={error ? "Проверьте доступ" : "Добавьте первого перевозчика"}
           />
