@@ -11,6 +11,7 @@
  */
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import NdEntityCard from "./NdEntityCard";
 
 // ── Типы ───────────────────────────────────────────────────────────────────
 export type ColType = "text" | "id" | "date" | "num" | "money" | "pct" | "status";
@@ -65,6 +66,10 @@ export type NdDataTableProps<R extends Row = Row> = {
   emptyHint?: string;
   keyboard?: boolean;
   stagger?: boolean;
+  // Мобильная карточка (≤640px). Не задан → строится автоматически из columns
+  // (первая/липкая колонка = заголовок, status-колонка = правый слот, остальные
+  // = факты). Задать для точной раскладки конкретного реестра.
+  card?: (r: R) => { title: ReactNode; subtitle?: ReactNode; right?: ReactNode; facts?: { label: string; value: ReactNode }[] };
 };
 
 // ── Форматтеры / типы колонок ──────────────────────────────────────────────
@@ -95,8 +100,17 @@ export default function NdDataTable<R extends Row = Row>(props: NdDataTableProps
     rowId = (r: R) => r.id as string | number,
     onRowClick, expand, bulkActions = [], bulkSummary,
     empty = "Нет данных по заданным условиям", emptyHint = "Смягчите фильтры или расширьте период",
-    keyboard = true, stagger = true,
+    keyboard = true, stagger = true, card,
   } = props;
+
+  // Телефон (≤640px): вместо таблицы — список карточек (тот же конфиг колонок).
+  const [isPhone, setIsPhone] = useState(() => typeof window !== "undefined" && window.matchMedia("(max-width: 640px)").matches);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 640px)");
+    const on = () => setIsPhone(mq.matches);
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
 
   const [sel, setSel] = useState<Set<string | number>>(new Set());
   const [open, setOpen] = useState<Set<string | number>>(new Set());
@@ -233,9 +247,57 @@ export default function NdDataTable<R extends Row = Row>(props: NdDataTableProps
   const pickedInView = select ? view.filter(r => sel.has(rowId(r))).length : 0;
   const allState = pickedInView === 0 ? "false" : pickedInView === view.length ? "true" : "mixed";
 
+  // ── мобильная карточка: заголовок = липкая/первая колонка, правый слот =
+  //    status-колонка, факты = остальные (тот же cellContent, что и в таблице) ──
+  const primaryCol = columns.find(c => c.sticky) || columns[0];
+  const statusCol = columns.find(c => c.type === "status" && c !== primaryCol);
+  const factCols = columns.filter(c => c !== primaryCol && c !== statusCol);
+  const buildCard = (r: R) => card ? card(r) : {
+    title: primaryCol ? cellContent(primaryCol, r) : null,
+    subtitle: undefined as ReactNode,
+    right: statusCol ? cellContent(statusCol, r) : undefined,
+    facts: factCols.map(c => ({ label: c.label, value: cellContent(c, r) })),
+  };
+
   return (
     <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
       <div className="table-card">
+        {isPhone && (
+          <div className="table-scroll" style={{ overflow: "auto" }}>
+            {loading ? (
+              <div className="nd-cards">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div className="nd-ecard" key={i} style={{ animation: "nd-fadeIn 200ms ease both", animationDelay: `${i * 40}ms` }}>
+                    <i className="skeleton" style={{ height: 58, borderRadius: 10 }} />
+                  </div>
+                ))}
+              </div>
+            ) : view.length === 0 ? (
+              <div style={{ padding: "56px 20px", textAlign: "center", animation: "nd-fadeUp 240ms var(--ease-standard) both" }}>
+                <div className="t-h3" style={{ color: "var(--text-2)" }}>{empty}</div>
+                <div className="t-body-s muted" style={{ marginTop: 6 }}>{emptyHint}</div>
+              </div>
+            ) : (
+              <div className="nd-cards">
+                {view.map(r => {
+                  const id = rowId(r); const opened = open.has(id); const spec = buildCard(r);
+                  return (
+                    <Fragment key={id}>
+                      <NdEntityCard
+                        title={spec.title} subtitle={spec.subtitle} right={spec.right} facts={spec.facts}
+                        clickable={!!(onRowClick || expand)}
+                        onClick={() => { if (expand) toggleExpand(id); else onRowClick?.(r, api); }}
+                        selectable={select} selected={sel.has(id)} onToggle={() => toggle(id)}
+                      />
+                      {opened && expand && <div className="nd-ecard" style={{ paddingTop: 4 }}>{expand(r)}</div>}
+                    </Fragment>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+        {!isPhone && (
         <div className="table-scroll" ref={scrollRef} tabIndex={0} onScroll={syncShadows} onKeyDown={onKey}>
           <div className="table" data-density={dense ? "compact" : "normal"} style={{ gridTemplateColumns: gridCols }}>
             {/* head */}
@@ -345,6 +407,7 @@ export default function NdDataTable<R extends Row = Row>(props: NdDataTableProps
             )}
           </div>
         </div>
+        )}
 
         {/* pager */}
         <div className="pager">
