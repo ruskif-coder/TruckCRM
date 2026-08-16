@@ -1180,3 +1180,22 @@
   .nd .workarea .w-handle, .nd .workarea .w-resize-x,
   .nd .workarea .w-resize-y, .nd .workarea .w-remove { display: none !important; }
 }
+
+/* ═══ Мобилизация: правки после ревью (сводка/дашборд/фильтры), ≤640px ═══════ */
+@media (max-width: 640px) {
+  /* Сводка: компактные плитки в ряд со скроллом (было — гигантские блоки во всю
+     ширину: grid minmax(200px,1fr) давал 1 колонку на телефоне). Как в шаблоне. */
+  .nd .summarystrip {
+    display: flex; flex-wrap: nowrap; overflow-x: auto; gap: 10px;
+    padding: 12px 16px 2px; scrollbar-width: none;
+  }
+  .nd .summarystrip::-webkit-scrollbar { display: none; }
+  .nd .summary { flex: 0 0 46%; min-width: 148px; padding: 12px 14px; }
+  .nd .summary__value { font-size: 20px; margin-top: 4px; }
+
+  /* Дашборд: виджет-таблица «Расчёт по неделям» на телефоне не нужна (шаблон). */
+  .nd .widget[data-wkey="weekly"] { display: none; }
+
+  /* Фильтры — плотнее (полноценно «под кнопку» — след. итерация, React). */
+  .nd .filterbar { gap: 8px; padding: 10px 16px; }
+}
