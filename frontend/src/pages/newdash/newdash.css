@@ -1142,3 +1142,41 @@
   font: 500 14px var(--font-ui); color: var(--ink); margin-top: 3px;
   overflow-wrap: anywhere; font-variant-numeric: tabular-nums;
 }
+
+/* ═══ Мобилизация /newdash, Этапы 3–5 (только телефон ≤640px) ═══════════════
+   Этап 3 — модалка снизу (лист); Этап 4 — topbar/вкладки/фильтры чипами со
+   скроллом/переносом; Этап 5 — дашборд в одну колонку, табло рейсов скрыто.
+   Всё под медиа-запросом — десктоп не затронут. ══════════════════════════ */
+@media (max-width: 640px) {
+  /* ── Этап 3: NdModal → лист снизу ── */
+  .nd-overlay { padding: 0; }
+  .nd-overlay--center, .nd-overlay--right { align-items: flex-end; justify-content: center; }
+  .nd-modal, .nd-modal--form, .nd-modal--panel, .nd-modal--wide, .nd-modal--sheet {
+    width: 100%; max-width: 100%; max-height: 92vh;
+    border-radius: 22px 22px 0 0;
+    animation: nd-sheetUp var(--dur-base) var(--ease-standard) both;
+  }
+  .nd-modal::before {
+    content: ""; position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+    width: 40px; height: 4px; border-radius: 2px; background: var(--line-strong); z-index: 5;
+  }
+  .nd-modal__head { padding-top: 24px; }
+  .nd-modal__foot { padding-bottom: calc(16px + env(safe-area-inset-bottom)); flex-wrap: wrap; }
+  .nd .nd-modal__close { top: 18px; }
+
+  /* ── Этап 4: topbar / вкладки / фильтры — перенос + горизонтальный скролл ── */
+  .nd .topbar { flex-wrap: wrap; height: auto; gap: 8px; padding: 12px 16px; }
+  .nd .section-tabs { flex-wrap: wrap; gap: 8px; padding-left: 16px; padding-right: 16px; }
+  .nd .section-tabs .segments { max-width: 100%; overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; }
+  .nd .section-tabs .segments::-webkit-scrollbar { display: none; }
+  .nd .section-tabs .spacer { display: none; }
+  .nd .filterbar { flex-wrap: wrap; gap: 8px; padding: 10px 16px; }
+  .nd .nd-fdrop__menu { max-width: calc(100vw - 24px); left: 0; right: auto; }
+
+  /* ── Этап 5: дашборд в одну колонку, табло рейсов скрыто, редактор скрыт ── */
+  .nd .workarea { grid-template-columns: 1fr; gap: 12px; padding: 12px 12px calc(84px + env(safe-area-inset-bottom)); }
+  .nd .widget { grid-column: 1 / -1 !important; }
+  .nd .widget[data-wkey="main"] { display: none; }   /* табло рейсов — на телефоне прячем */
+  .nd .workarea .w-handle, .nd .workarea .w-resize-x,
+  .nd .workarea .w-resize-y, .nd .workarea .w-remove { display: none !important; }
+}
