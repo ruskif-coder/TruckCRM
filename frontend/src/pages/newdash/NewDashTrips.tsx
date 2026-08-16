@@ -13,10 +13,12 @@ import NdSectionTabs, { TRIPS_TABS } from "./NdSectionTabs";
 import NdMultiSelect from "./NdMultiSelect";
 import NdDateRange from "./NdDateRange";
 import NdSortReset from "./NdSortReset";
+import NdFilters, { NdFilterButton } from "./NdFilters";
+import NdPhoneHead from "./NdPhoneHead";
 import NdModal from "./NdModal";
 import NdDataTable from "./NdDataTable";
 import type { Column } from "./NdDataTable";
-import { fmtDateTime, NdSearch } from "./shared";
+import { fmtDateTime, NdSearch, useIsPhone } from "./shared";
 import "./newdash.css";
 
 type Trip = {
@@ -90,6 +92,14 @@ export default function NewDashTrips() {
   const [onlyFines, setOnlyFines] = useState(false);
   const [sorted, setSorted] = useState(false);
   const resetSortRef = useRef<() => void>(() => {});
+  const isPhone = useIsPhone();
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const activeCount = (statusF.size ? 1 : 0) + (driverF.size ? 1 : 0) + (truckF.size ? 1 : 0) + (carrierF.size ? 1 : 0) + (onlyFines ? 1 : 0) + (sorted ? 1 : 0);
+  const resetAllFilters = () => {
+    setStatusF(new Set()); setDriverF(new Set()); setTruckF(new Set()); setCarrierF(new Set()); setOnlyFines(false);
+    setDateFrom(isoDate(new Date(Date.now() - 60 * 864e5))); setDateTo(isoDate(new Date()));
+    resetSortRef.current();
+  };
 
   // импорт/экспорт/шаблон
   const [importOpen, setImportOpen] = useState(false);
@@ -206,25 +216,41 @@ export default function NewDashTrips() {
 
       <main className="main">
         {/* Шапка */}
-        <header className="topbar">
-          <div className="topbar__title">
-            <h1 className="t-h1" style={{ margin: 0 }}>Рейсы</h1>
-            <span className="t-mono muted">реестр · {trips.length}</span>
-          </div>
-          <div className="spacer" />
-          <NdSearch value={q} onChange={setQ} placeholder="Заявка, водитель, машина…" />
-        </header>
+        {isPhone ? (
+          <NdPhoneHead
+            title="Рейсы"
+            subtitle={`реестр · ${trips.length}`}
+            onAdd={openImport}
+            menu={<>
+              <NdSectionTabs tabs={TRIPS_TABS} />
+              <button className="btn btn--ghost" disabled={busy === "template"} onClick={handleTemplate}>Скачать шаблон .xlsx</button>
+              <button className="btn btn--ghost" disabled={busy === "export"} onClick={handleExport}>Экспорт в .xlsx</button>
+              <button className="btn btn--ghost" onClick={() => setDense(d => !d)}>{dense ? "Компактный вид" : "Обычный вид"}</button>
+            </>}
+          />
+        ) : (
+          <>
+            <header className="topbar">
+              <div className="topbar__title">
+                <h1 className="t-h1" style={{ margin: 0 }}>Рейсы</h1>
+                <span className="t-mono muted">реестр · {trips.length}</span>
+              </div>
+              <div className="spacer" />
+              <NdSearch value={q} onChange={setQ} placeholder="Заявка, водитель, машина…" />
+            </header>
 
-        <NdSectionTabs tabs={TRIPS_TABS} right={<>
-          <button className="btn btn--ghost" onClick={() => setDense(d => !d)}>{dense ? "Обычно" : "Компактно"}</button>
-          <button type="button" className="icon-btn" title="Скачать шаблон .xlsx" disabled={busy === "template"} onClick={handleTemplate}>
-            <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="1.5" width="9" height="12" rx="1.5" /><path d="M5.2 5h4.6" /><path d="M5.2 7.6h4.6" /><path d="M5.2 10.2h2.8" /></svg>
-          </button>
-          <button type="button" className="icon-btn" title="Экспорт в .xlsx" disabled={busy === "export"} onClick={handleExport}>
-            <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round"><path d="M7.5 1.5v8" /><path d="M4.2 6.2 7.5 9.5l3.3-3.3" /><path d="M2.4 12.5h10.2" /></svg>
-          </button>
-          <button type="button" className="btn btn--accent" onClick={openImport}>Импорт реестра</button>
-        </>} />
+            <NdSectionTabs tabs={TRIPS_TABS} right={<>
+              <button className="btn btn--ghost" onClick={() => setDense(d => !d)}>{dense ? "Обычно" : "Компактно"}</button>
+              <button type="button" className="icon-btn" title="Скачать шаблон .xlsx" disabled={busy === "template"} onClick={handleTemplate}>
+                <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="1.5" width="9" height="12" rx="1.5" /><path d="M5.2 5h4.6" /><path d="M5.2 7.6h4.6" /><path d="M5.2 10.2h2.8" /></svg>
+              </button>
+              <button type="button" className="icon-btn" title="Экспорт в .xlsx" disabled={busy === "export"} onClick={handleExport}>
+                <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round"><path d="M7.5 1.5v8" /><path d="M4.2 6.2 7.5 9.5l3.3-3.3" /><path d="M2.4 12.5h10.2" /></svg>
+              </button>
+              <button type="button" className="btn btn--accent" onClick={openImport}>Импорт реестра</button>
+            </>} />
+          </>
+        )}
 
         {/* Виджеты-сводки по выборке */}
         <div className="summarystrip">
@@ -234,8 +260,16 @@ export default function NewDashTrips() {
           <div className="summary"><div className="summary__label">Штрафы по выборке</div><div className="summary__value neg">{loading ? "…" : money(totalFines)}</div></div>
         </div>
 
-        {/* Фильтры */}
-        <div className="filterbar">
+        {/* Телефон: строка поиска + воронка фильтров (под виджетами) */}
+        {isPhone && (
+          <div className="nd-searchrow">
+            <NdSearch value={q} onChange={setQ} placeholder="Заявка, водитель, машина…" />
+            <NdFilterButton count={activeCount} onClick={() => setFiltersOpen(true)} />
+          </div>
+        )}
+
+        {/* Фильтры: десктоп — строка, телефон — лист снизу по воронке */}
+        <NdFilters open={filtersOpen} onClose={() => setFiltersOpen(false)} onReset={resetAllFilters} section="Рейсы">
           <NdDateRange from={dateFrom} to={dateTo} onFrom={setDateFrom} onTo={setDateTo} />
           <NdMultiSelect label="Статус" options={statusOptions} selected={statusF} onChange={setStatusF} />
           <NdMultiSelect label="Водитель" options={driverOptions} selected={driverF} onChange={setDriverF} />
@@ -246,10 +280,10 @@ export default function NewDashTrips() {
             Штрафы
           </button>
           <NdSortReset active={sorted} onReset={() => resetSortRef.current()} />
-        </div>
+        </NdFilters>
 
-        {/* Таблица */}
-        <div style={{ flex: 1, minHeight: 0, padding: "12px 24px 20px", display: "flex", flexDirection: "column" }}>
+        {/* Таблица (телефон — карточки без обёртки) */}
+        <div className={isPhone ? "nd-listwrap" : undefined} style={isPhone ? undefined : { flex: 1, minHeight: 0, padding: "12px 24px 20px", display: "flex", flexDirection: "column" }}>
           <NdDataTable<Row>
             columns={COLUMNS}
             rows={rows}

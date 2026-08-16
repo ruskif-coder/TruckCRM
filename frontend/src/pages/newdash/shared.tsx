@@ -4,7 +4,21 @@
  * поле формы, форматтер даты-времени, короткая дата, дефолтный диапазон,
  * обёртка mouse-drag. Использовать вместо локальных копий.
  */
+import { useEffect, useState } from "react";
 import { isoDate } from "../../lib/format";
+
+// Телефон (≤640px). Общий хук для мобильной ветки (NdMenu/NdDataTable/страницы).
+export function useIsPhone(max = 640): boolean {
+  const q = `(max-width: ${max}px)`;
+  const [isPhone, setIsPhone] = useState(() => typeof window !== "undefined" && window.matchMedia(q).matches);
+  useEffect(() => {
+    const mq = window.matchMedia(q);
+    const on = () => setIsPhone(mq.matches);
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, [q]);
+  return isPhone;
+}
 
 // ── Поиск (иконка + прозрачный инпут) — был скопирован в ~14 файлах ──
 export function NdSearch({ value, onChange, placeholder, width = 260 }: {

@@ -1060,7 +1060,7 @@
 @media (max-width: 640px) {
   .nd { min-width: 0; height: 100vh; height: 100dvh; }
   .nd .menu-slot { display: none; }              /* десктопный сайдбар прячем */
-  .nd .main { padding: 0; }
+  .nd .main { padding: 0 !important; }   /* перебиваем легаси .main-паддинги */
   .nd .workarea { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
   .nd .topbar { padding-left: 16px; padding-right: 16px; }
 
@@ -1183,14 +1183,12 @@
 
 /* ═══ Мобилизация: правки после ревью (сводка/дашборд/фильтры), ≤640px ═══════ */
 @media (max-width: 640px) {
-  /* Сводка: компактные плитки в ряд со скроллом (было — гигантские блоки во всю
-     ширину: grid minmax(200px,1fr) давал 1 колонку на телефоне). Как в шаблоне. */
+  /* Сводка-виджеты: сетка 2×2 (было — гигантские блоки во всю ширину). */
   .nd .summarystrip {
-    display: flex; flex-wrap: nowrap; overflow-x: auto; gap: 10px;
-    padding: 12px 16px 2px; scrollbar-width: none;
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;
+    padding: 12px 12px 2px;
   }
-  .nd .summarystrip::-webkit-scrollbar { display: none; }
-  .nd .summary { flex: 0 0 46%; min-width: 148px; padding: 12px 14px; }
+  .nd .summary { padding: 12px 14px; }
   .nd .summary__value { font-size: 20px; margin-top: 4px; }
 
   /* Дашборд: виджет-таблица «Расчёт по неделям» на телефоне не нужна (шаблон). */
@@ -1221,4 +1219,42 @@
   .nd-fsheet__body .nd-fdrop, .nd-fsheet__body .nd-fdrop > button { width: 100%; }
   .nd-fsheet__body .nd-fdrop__menu { position: static; box-shadow: none; border: 0; padding: 4px 0 0; max-height: none; }
   .nd-fsheet__foot { display: flex; gap: 8px; padding: 14px 16px calc(16px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); }
+}
+
+/* ═══ Мобильная страница-реестр (телефон ≤640): шапка/поиск/список ═══════════
+   Порядок: NdPhoneHead (заголовок+«+»+бургер) → сводка 2×2 → строка поиска+
+   воронка → карточки БЕЗ обёртки-таблицы, маленькие боковые отступы. ═══════ */
+@media (max-width: 640px) {
+  /* Шапка страницы */
+  .nd .nd-phead {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 14px 16px 8px; background: var(--bg);
+  }
+  .nd .nd-phead__titles { flex: 1; min-width: 0; }
+  .nd .nd-phead__title { margin: 0; font: 700 22px/1.15 var(--font-ui); color: var(--ink); }
+  .nd .nd-phead__sub { font: 500 12px var(--font-mono); color: var(--text-3); margin-top: 2px; }
+  .nd .nd-phead__add {
+    flex: none; width: 44px; height: 44px; border-radius: 13px; border: 0;
+    background: var(--accent); color: var(--on-accent); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .nd .nd-phead__burger {
+    flex: none; width: 44px; height: 44px; border-radius: 13px;
+    border: 1px solid var(--line); background: var(--surface); color: var(--text-2); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .nd .nd-phead__menu { padding: 6px 12px 8px; display: flex; flex-direction: column; gap: 8px; }
+  .nd .nd-phead__menu .section-tabs { padding: 0; }
+  .nd .nd-phead__menu .btn { width: 100%; justify-content: center; }
+
+  /* Строка поиска + воронка (под виджетами) */
+  .nd .nd-searchrow { display: flex; align-items: center; gap: 10px; padding: 8px 12px 4px; }
+  .nd .nd-searchrow .search { flex: 1; min-width: 0; }
+
+  /* Список карточек — БЕЗ рамки/фона таблицы, маленькие отступы по бокам */
+  .nd .nd-listwrap { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 4px 10px 8px; }
+  .nd .nd-listwrap .table-card { border: 0; background: transparent; border-radius: 0; overflow: visible; }
+  .nd .nd-listwrap .table-scroll { overflow: visible; }
+  .nd .nd-cards { padding: 0; gap: 10px; }
+  .nd .nd-listwrap .pager { padding: 12px 4px 0; border: 0; background: transparent; flex-wrap: wrap; }
 }
