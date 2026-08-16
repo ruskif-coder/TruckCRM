@@ -1258,3 +1258,8 @@
   .nd .nd-cards { padding: 0; gap: 10px; }
   .nd .nd-listwrap .pager { padding: 12px 4px 0; border: 0; background: transparent; flex-wrap: wrap; }
 }
+
+/* NdEntityCard: правый слот (сумма/штраф) выравниваем вправо; шеврон сворачивания. */
+.nd .nd-ecard__right { flex: none; text-align: right; align-self: flex-start; }
+.nd .nd-ecard__chev { flex: none; color: var(--text-3); transition: transform .18s ease; margin-top: 2px; }
+.nd .nd-ecard__chev[data-open] { transform: rotate(180deg); }

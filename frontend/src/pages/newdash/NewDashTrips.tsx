@@ -217,17 +217,19 @@ export default function NewDashTrips() {
       <main className="main">
         {/* Шапка */}
         {isPhone ? (
-          <NdPhoneHead
-            title="Рейсы"
-            subtitle={`реестр · ${trips.length}`}
-            onAdd={openImport}
-            menu={<>
-              <NdSectionTabs tabs={TRIPS_TABS} />
-              <button className="btn btn--ghost" disabled={busy === "template"} onClick={handleTemplate}>Скачать шаблон .xlsx</button>
-              <button className="btn btn--ghost" disabled={busy === "export"} onClick={handleExport}>Экспорт в .xlsx</button>
-              <button className="btn btn--ghost" onClick={() => setDense(d => !d)}>{dense ? "Компактный вид" : "Обычный вид"}</button>
-            </>}
-          />
+          <>
+            <NdPhoneHead
+              title="Рейсы"
+              subtitle={`реестр · ${trips.length}`}
+              onAdd={openImport}
+              menu={<>
+                <button className="btn btn--ghost" disabled={busy === "template"} onClick={handleTemplate}>Скачать шаблон .xlsx</button>
+                <button className="btn btn--ghost" disabled={busy === "export"} onClick={handleExport}>Экспорт в .xlsx</button>
+                <button className="btn btn--ghost" onClick={() => setDense(d => !d)}>{dense ? "Компактный вид" : "Обычный вид"}</button>
+              </>}
+            />
+            <NdSectionTabs tabs={TRIPS_TABS} />
+          </>
         ) : (
           <>
             <header className="topbar">
@@ -290,6 +292,20 @@ export default function NewDashTrips() {
             loading={loading}
             dense={dense}
             select
+            card={r => ({
+              title: <>№{r.request_number} <span className={`status status--${statusTone(r.status)}`} style={{ marginLeft: 6 }}>{r.status || "—"}</span></>,
+              subtitle: fmtDateTime(r.dep_at),
+              right: <>
+                <div style={{ fontWeight: 500, fontFamily: "var(--font-mono)", fontSize: 15, color: r.amount ? undefined : "var(--text-4)" }}>{money(r.amount)}</div>
+                {r.fines ? <div className="neg" style={{ fontFamily: "var(--font-mono)", fontSize: 11, marginTop: 3 }}>штраф {money(r.fines)}</div> : null}
+              </>,
+              collapsible: true,
+              facts: [
+                { label: "Водитель", value: r.driver || "—" },
+                { label: "Машина", value: r.truck || "—" },
+                { label: "Окончание", value: r.end_at ? fmtDateTime(r.end_at) : "—" },
+              ],
+            })}
             onSortActive={setSorted}
             resetRef={resetSortRef}
             sortKey="dep_at"

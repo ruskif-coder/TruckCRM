@@ -69,7 +69,7 @@ export type NdDataTableProps<R extends Row = Row> = {
   // Мобильная карточка (≤640px). Не задан → строится автоматически из columns
   // (первая/липкая колонка = заголовок, status-колонка = правый слот, остальные
   // = факты). Задать для точной раскладки конкретного реестра.
-  card?: (r: R) => { title: ReactNode; subtitle?: ReactNode; right?: ReactNode; facts?: { label: string; value: ReactNode }[] };
+  card?: (r: R) => { title: ReactNode; subtitle?: ReactNode; right?: ReactNode; collapsible?: boolean; facts?: { label: string; value: ReactNode }[] };
 };
 
 // ── Форматтеры / типы колонок ──────────────────────────────────────────────
@@ -285,6 +285,7 @@ export default function NdDataTable<R extends Row = Row>(props: NdDataTableProps
                     <Fragment key={id}>
                       <NdEntityCard
                         title={spec.title} subtitle={spec.subtitle} right={spec.right} facts={spec.facts}
+                        collapsible={spec.collapsible}
                         clickable={!!(onRowClick || expand)}
                         onClick={() => { if (expand) toggleExpand(id); else onRowClick?.(r, api); }}
                         selectable={select} selected={sel.has(id)} onToggle={() => toggle(id)}
