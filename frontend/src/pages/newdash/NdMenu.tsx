@@ -22,6 +22,14 @@ const BellIcon = (
 
 const svgProps = { width: 18, height: 18, fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
 
+// «Ещё» — пятый таб нижнего таб-бара на телефоне (открывает лист снизу).
+const MoreIcon = (
+  <svg {...svgProps}><circle cx="4" cy="9" r="1.4" /><circle cx="9" cy="9" r="1.4" /><circle cx="14" cy="9" r="1.4" /></svg>
+);
+// Разделы нижнего таб-бара (телефон): 4 основных + «Ещё». Остальное — в лист.
+const PHONE_PRIMARY: NavKey[] = ["desk", "trips", "cars", "finance"];
+const PHONE_MORE: NavKey[] = ["drivers", "refs", "reports", "repair", "settings"];
+
 export type NavKey = "desk" | "trips" | "cars" | "drivers" | "refs" | "finance" | "repair" | "reports" | "settings";
 type Child = { label: string; to: string };
 type Item = { key: NavKey; label: string; to: string; icon: ReactNode; badge?: number; children?: Child[] };
@@ -87,6 +95,15 @@ export default function NdMenu({ active }: { active: NavKey }) {
   const [hover, setHover] = useState(false);
   const [hoverKey, setHoverKey] = useState<NavKey | null>(null);
   const menuOpen = pinned || hover;
+  // Телефон (≤640px): вместо бокового меню — нижний таб-бар + лист «Ещё».
+  const [isPhone, setIsPhone] = useState(() => typeof window !== "undefined" && window.matchMedia("(max-width: 640px)").matches);
+  const [moreOpen, setMoreOpen] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 640px)");
+    const on = () => setIsPhone(mq.matches);
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
 
   // Ролевое сокрытие: админ-подпункты «Настроек» не-админам не показываем
   // (бэкенд всё равно гейтит, но нечего светить структуру и ловить лишние 403).
@@ -114,6 +131,58 @@ export default function NdMenu({ active }: { active: NavKey }) {
   // раздел активен, если открыта его страница или один из вложенных URL
   const sectionActive = (it: Item) =>
     it.key === active || pathname === it.to || (it.children?.some(c => pathname === c.to) ?? false);
+
+  // ── Телефон: нижний таб-бар (4 раздела + «Ещё») и лист «Ещё» снизу ──
+  if (isPhone) {
+    const go = (to: string) => { setMoreOpen(false); navigate(to); };
+    const moreActive = PHONE_MORE.some(k => { const it = NAV.find(n => n.key === k); return it ? sectionActive(it) : false; });
+    return (
+      <>
+        <nav className="nd-tabbar">
+          {PHONE_PRIMARY.map(key => {
+            const it = NAV.find(n => n.key === key)!;
+            const bell = badgeOf(it);
+            return (
+              <button key={key} className="nd-tabbar__item" aria-current={sectionActive(it) ? "page" : undefined} onClick={() => go(it.to)}>
+                <span className="nd-tabbar__icon">{it.icon}{bell ? <span className="nd-tabbar__dot" /> : null}</span>
+                <span className="nd-tabbar__label">{it.label}</span>
+              </button>
+            );
+          })}
+          <button className="nd-tabbar__item" aria-current={moreActive ? "page" : undefined} onClick={() => setMoreOpen(true)}>
+            <span className="nd-tabbar__icon">{MoreIcon}{repairOpen ? <span className="nd-tabbar__dot" /> : null}</span>
+            <span className="nd-tabbar__label">Ещё</span>
+          </button>
+        </nav>
+
+        {moreOpen && (
+          <div className="nd-msheet" onClick={() => setMoreOpen(false)}>
+            <div className="nd-msheet__backdrop" />
+            <div className="nd-msheet__panel" onClick={e => e.stopPropagation()}>
+              <div className="nd-msheet__grip"><i /></div>
+              <div className="nd-msheet__list">
+                {PHONE_MORE.map(key => {
+                  const it = NAV.find(n => n.key === key)!;
+                  const bell = badgeOf(it);
+                  return (
+                    <button key={key} className="nd-msheet__item" aria-current={sectionActive(it) ? "page" : undefined} onClick={() => go(it.to)}>
+                      <span className="nd-msheet__ico">{it.icon}</span>
+                      <span style={{ flex: 1 }}>{it.label}</span>
+                      {bell ? <span className="menu__bell">{BellIcon}<span className="menu__bell-count">{bell > 9 ? "9+" : bell}</span></span> : null}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="nd-msheet__foot">
+                <button className="nd-msheet__item" onClick={toggleTheme}>{theme === "dark" ? "Светлая тема" : "Тёмная тема"}</button>
+                <button className="nd-msheet__item" onClick={() => { setMoreOpen(false); logout(); navigate("/login", { replace: true }); }}>Выйти</button>
+              </div>
+            </div>
+          </div>
+        )}
+      </>
+    );
+  }
 
   return (
     <div className="menu-slot" data-pinned={pinned}>
