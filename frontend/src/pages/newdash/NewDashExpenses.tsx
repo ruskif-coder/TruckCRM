@@ -11,6 +11,7 @@ import NdSectionTabs, { FINANCE_TABS } from "./NdSectionTabs";
 import NdMultiSelect from "./NdMultiSelect";
 import NdDateRange from "./NdDateRange";
 import NdSortReset from "./NdSortReset";
+import NdFilters, { NdFilterButton } from "./NdFilters";
 import NdModal from "./NdModal";
 import NdDataTable from "./NdDataTable";
 import type { Column } from "./NdDataTable";
@@ -51,8 +52,15 @@ export default function NewDashExpenses() {
   const [statusF, setStatusF] = useState<Set<string>>(new Set());
   const [bankF, setBankF] = useState<Set<string>>(new Set());
   const [catF, setCatF] = useState<Set<string>>(new Set());
+  const [filtersOpen, setFiltersOpen] = useState(false);   // моб. лист фильтров
   const [sorted, setSorted] = useState(false);
   const resetSortRef = useRef<() => void>(() => {});
+  const activeCount = (statusF.size ? 1 : 0) + (bankF.size ? 1 : 0) + (catF.size ? 1 : 0) + (sorted ? 1 : 0);
+  const resetAllFilters = () => {
+    setStatusF(new Set()); setBankF(new Set()); setCatF(new Set());
+    setDateFrom(isoDate(new Date(Date.now() - 60 * 864e5))); setDateTo(isoDate(new Date()));
+    resetSortRef.current();
+  };
 
   const [editId, setEditId] = useState<number | null>(null);
   const [form, setForm] = useState<FS>(emptyForm());
@@ -134,6 +142,7 @@ export default function NewDashExpenses() {
           <div className="topbar__title"><h1 className="t-h1" style={{ margin: 0 }}>Реестр расходов</h1><span className="t-mono muted">операций · {entries.length}</span></div>
           <div className="spacer" />
           <NdSearch value={q} onChange={setQ} placeholder="Статья, контрагент, назначение…" />
+          <NdFilterButton count={activeCount} onClick={() => setFiltersOpen(true)} />
         </header>
 
         <NdSectionTabs tabs={FINANCE_TABS} right={<>
@@ -147,13 +156,13 @@ export default function NewDashExpenses() {
           <div className="summary"><div className="summary__label">Доход по выборке</div><div className="summary__value" style={{ color: "var(--success-strong)" }}>{loading ? "…" : money(totalIncome)}</div></div>
         </div>
 
-        <div className="filterbar">
+        <NdFilters open={filtersOpen} onClose={() => setFiltersOpen(false)} onReset={resetAllFilters} section="Финансы">
           <NdDateRange from={dateFrom} to={dateTo} onFrom={setDateFrom} onTo={setDateTo} />
           <NdMultiSelect label="Статус" options={STATUSES} selected={statusF} onChange={setStatusF} />
           <NdMultiSelect label="Банк" options={bankOptions} selected={bankF} onChange={setBankF} />
           <NdMultiSelect label="Статья" options={catOptions} selected={catF} onChange={setCatF} />
           <NdSortReset active={sorted} onReset={() => resetSortRef.current()} />
-        </div>
+        </NdFilters>
 
         <div style={{ flex: 1, minHeight: 0, padding: "12px 24px 20px", display: "flex", flexDirection: "column" }}>
           <NdDataTable<Row>

@@ -1199,3 +1199,26 @@
   /* Фильтры — плотнее (полноценно «под кнопку» — след. итерация, React). */
   .nd .filterbar { gap: 8px; padding: 10px 16px; }
 }
+
+/* Фильтры-под-воронкой (NdFilters) — только телефон. Кнопка рядом с поиском +
+   лист снизу «Фильтры». .nd-filter-btn на десктопе скрыта. */
+.nd .nd-filter-btn { display: none; }
+@media (max-width: 640px) {
+  .nd .nd-filter-btn {
+    display: inline-flex; align-items: center; justify-content: center; position: relative;
+    flex: none; width: 44px; height: 44px; border-radius: 12px;
+    border: 1px solid var(--line); background: var(--surface); color: var(--text-2); cursor: pointer;
+  }
+  .nd .nd-filter-btn__badge {
+    position: absolute; top: -5px; right: -5px; min-width: 18px; height: 18px; padding: 0 4px;
+    border-radius: 9px; background: var(--accent); color: var(--on-accent);
+    font: 600 11px/18px var(--font-mono); text-align: center;
+  }
+  .nd-fsheet__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 6px 16px 14px; border-bottom: 1px solid var(--line); }
+  .nd-fsheet__close { flex: none; }
+  .nd-fsheet__body { padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; }
+  .nd-fsheet__body > * { width: 100%; }
+  .nd-fsheet__body .nd-fdrop, .nd-fsheet__body .nd-fdrop > button { width: 100%; }
+  .nd-fsheet__body .nd-fdrop__menu { position: static; box-shadow: none; border: 0; padding: 4px 0 0; max-height: none; }
+  .nd-fsheet__foot { display: flex; gap: 8px; padding: 14px 16px calc(16px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); }
+}
