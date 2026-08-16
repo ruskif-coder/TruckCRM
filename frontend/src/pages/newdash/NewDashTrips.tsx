@@ -225,7 +225,6 @@ export default function NewDashTrips() {
               menu={<>
                 <button className="btn btn--ghost" disabled={busy === "template"} onClick={handleTemplate}>Скачать шаблон .xlsx</button>
                 <button className="btn btn--ghost" disabled={busy === "export"} onClick={handleExport}>Экспорт в .xlsx</button>
-                <button className="btn btn--ghost" onClick={() => setDense(d => !d)}>{dense ? "Компактный вид" : "Обычный вид"}</button>
               </>}
             />
             <NdSectionTabs tabs={TRIPS_TABS} />

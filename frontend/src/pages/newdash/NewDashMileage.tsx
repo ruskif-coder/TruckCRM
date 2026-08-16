@@ -11,10 +11,12 @@ import NdSectionTabs, { TRIPS_TABS } from "./NdSectionTabs";
 import NdMultiSelect from "./NdMultiSelect";
 import NdDateRange from "./NdDateRange";
 import NdSortReset from "./NdSortReset";
+import NdFilters, { NdFilterButton } from "./NdFilters";
+import NdPhoneHead from "./NdPhoneHead";
 import NdModal from "./NdModal";
 import NdDataTable from "./NdDataTable";
 import type { Column } from "./NdDataTable";
-import { NdSearch } from "./shared";
+import { NdSearch, useIsPhone } from "./shared";
 import "./newdash.css";
 
 type MileageEntry = { id: number; date: string; truck_id: number; driver_id: number | null; odometer: number | null; is_service: boolean; note: string };
@@ -46,6 +48,14 @@ export default function NewDashMileage() {
   const resetSortRef = useRef<() => void>(() => {});
   const [dateFrom, setDateFrom] = useState(() => isoDate(new Date(Date.now() - 60 * 864e5)));
   const [dateTo, setDateTo] = useState(() => isoDate(new Date()));
+  const isPhone = useIsPhone();
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const activeCount = (truckF.size ? 1 : 0) + (driverF.size ? 1 : 0) + (onlyService ? 1 : 0) + (sorted ? 1 : 0);
+  const resetAllFilters = () => {
+    setTruckF(new Set()); setDriverF(new Set()); setOnlyService(false);
+    setDateFrom(isoDate(new Date(Date.now() - 60 * 864e5))); setDateTo(isoDate(new Date()));
+    resetSortRef.current();
+  };
 
   // Внесение пробега
   const [addOpen, setAddOpen] = useState(false);
@@ -124,21 +134,33 @@ export default function NewDashMileage() {
     <div className="nd">
       <NdMenu active="trips" />
       <main className="main">
-        <header className="topbar">
-          <div className="topbar__title">
-            <h1 className="t-h1" style={{ margin: 0 }}>Пробеги</h1>
-            <span className="t-mono muted">журнал · {entries.length}</span>
-          </div>
-          <div className="spacer" />
-          <NdSearch value={q} onChange={setQ} placeholder="Машина, водитель, примечание…" />
-        </header>
+        {isPhone ? (
+          <>
+            <NdPhoneHead title="Пробеги" subtitle={`журнал · ${entries.length}`} onAdd={openAdd} />
+            <NdSectionTabs tabs={TRIPS_TABS} />
+            <div className="nd-searchrow">
+              <NdSearch value={q} onChange={setQ} placeholder="Машина, водитель, примечание…" />
+              <NdFilterButton count={activeCount} onClick={() => setFiltersOpen(true)} />
+            </div>
+          </>
+        ) : (
+          <>
+            <header className="topbar">
+              <div className="topbar__title">
+                <h1 className="t-h1" style={{ margin: 0 }}>Пробеги</h1>
+                <span className="t-mono muted">журнал · {entries.length}</span>
+              </div>
+              <div className="spacer" />
+              <NdSearch value={q} onChange={setQ} placeholder="Машина, водитель, примечание…" />
+            </header>
+            <NdSectionTabs tabs={TRIPS_TABS} right={<>
+              <button className="btn btn--ghost" onClick={() => setDense(d => !d)}>{dense ? "Обычно" : "Компактно"}</button>
+              <button className="btn btn--accent" onClick={openAdd}>Внести пробег</button>
+            </>} />
+          </>
+        )}
 
-        <NdSectionTabs tabs={TRIPS_TABS} right={<>
-          <button className="btn btn--ghost" onClick={() => setDense(d => !d)}>{dense ? "Обычно" : "Компактно"}</button>
-          <button className="btn btn--accent" onClick={openAdd}>Внести пробег</button>
-        </>} />
-
-        <div className="filterbar">
+        <NdFilters open={filtersOpen} onClose={() => setFiltersOpen(false)} onReset={resetAllFilters} section="Пробеги">
           <NdDateRange from={dateFrom} to={dateTo} onFrom={setDateFrom} onTo={setDateTo} />
           <NdMultiSelect label="Машина" options={truckOptions} selected={truckF} onChange={setTruckF} />
           <NdMultiSelect label="Водитель" options={driverOptions} selected={driverF} onChange={setDriverF} />
@@ -147,15 +169,25 @@ export default function NewDashMileage() {
             Только ТО
           </button>
           <NdSortReset active={sorted} onReset={() => resetSortRef.current()} />
-        </div>
+        </NdFilters>
 
-        <div style={{ flex: 1, minHeight: 0, padding: "12px 24px 20px", display: "flex", flexDirection: "column" }}>
+        <div className={isPhone ? "nd-listwrap" : undefined} style={isPhone ? undefined : { flex: 1, minHeight: 0, padding: "12px 24px 20px", display: "flex", flexDirection: "column" }}>
           <NdDataTable<Row>
             columns={COLUMNS}
             rows={rows}
             loading={loading}
             dense={dense}
             select
+            card={r => ({
+              title: <>{fmtDate(r.date as string)}{r.is_service ? <span className="status status--ok" style={{ marginLeft: 6 }}>ТО</span> : null}</>,
+              subtitle: r.truck,
+              right: <div style={{ fontFamily: "var(--font-mono)", fontWeight: 500 }}>{r.odometer != null ? `${(r.odometer as number).toLocaleString("ru-RU")} км` : "—"}</div>,
+              collapsible: true,
+              facts: [
+                { label: "Водитель", value: r.driver || "—" },
+                { label: "Примечание", value: r.note || "—" },
+              ],
+            })}
             onSortActive={setSorted}
             resetRef={resetSortRef}
             sortKey="date"

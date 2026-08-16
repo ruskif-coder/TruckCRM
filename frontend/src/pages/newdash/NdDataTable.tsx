@@ -111,6 +111,7 @@ export default function NdDataTable<R extends Row = Row>(props: NdDataTableProps
     mq.addEventListener("change", on);
     return () => mq.removeEventListener("change", on);
   }, []);
+  const denseEff = isPhone ? true : dense;   // на телефоне всегда компактно
 
   const [sel, setSel] = useState<Set<string | number>>(new Set());
   const [open, setOpen] = useState<Set<string | number>>(new Set());
@@ -300,7 +301,7 @@ export default function NdDataTable<R extends Row = Row>(props: NdDataTableProps
         )}
         {!isPhone && (
         <div className="table-scroll" ref={scrollRef} tabIndex={0} onScroll={syncShadows} onKeyDown={onKey}>
-          <div className="table" data-density={dense ? "compact" : "normal"} style={{ gridTemplateColumns: gridCols }}>
+          <div className="table" data-density={denseEff ? "compact" : "normal"} style={{ gridTemplateColumns: gridCols }}>
             {/* head */}
             <div className="table__head">
               {select && (
