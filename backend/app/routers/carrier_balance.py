@@ -12,15 +12,19 @@
 """
 
 from collections import defaultdict
-from datetime import date as date_type, timedelta
+from datetime import date as date_type, datetime, timedelta
+from io import BytesIO
 
-from fastapi import APIRouter, Depends, HTTPException
+import openpyxl
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import Response
 from sqlmodel import Session, select
 
 from .. import models
 from ..auth import get_current_user
 from ..database import get_session
-from ..models import Carrier, CashFlowEntry, Counterparty, Trip
+from ..importers.trip_registry import EXPORT_HEADERS
+from ..models import Carrier, CashFlowEntry, Counterparty, Driver, Trip, Truck
 
 router = APIRouter(prefix="/api/carriers/balance", tags=["carrier-balance"])
 _auth = [Depends(get_current_user)]
@@ -149,3 +153,80 @@ def carrier_balance_summary(
 
     result.sort(key=lambda r: -r["balance"])
     return result
+
+
+@router.get("/export")
+def carrier_export(
+    carrier: str = Query(..., description="Имя перевозчика"),
+    session: Session = Depends(get_session),
+    user: models.User = Depends(_require_staff),
+):
+    """XLSX по одному перевозчику (кнопка выгрузки в строке «Отчёты →
+    Перевозчики»), 2 листа:
+      1) «Сводная по неделям» — итоги за всё время (виджеты) + разбивка по неделям
+         (как в раскрывающемся отчёте: Рейсов/Брутто/Штрафы/Netto после СК);
+      2) «Реестр рейсов» — все рейсы перевозчика за всё время в нашем стандартном
+         формате (те же колонки, что и экспорт реестра поездок).
+    """
+    name = carrier.strip()
+    row = next((r for r in carrier_balance_summary(session, user) if r["carrier_name"] == name), None)
+    if row is None:
+        raise HTTPException(404, "Перевозчик не найден")
+
+    wb = openpyxl.Workbook()
+
+    # ── Лист 1: сводная по неделям + итоги за всё время ──
+    ws1 = wb.active
+    ws1.title = "Сводная по неделям"
+    ws1.append([f"Перевозчик: {name}"])
+    ws1.append([])
+    ws1.append(["Итоги за всё время", ""])
+    ws1.append(["Рейсов", row["trips"]])
+    ws1.append(["Брутто", row["gross"]])
+    ws1.append(["Штрафы", row["fines"]])
+    ws1.append(["Netto (после СК)", row["net"]])
+    ws1.append(["Оплачено", row["paid"]])
+    ws1.append(["Баланс", row["balance"]])
+    ws1.append([])
+    ws1.append(["Неделя", "Рейсов", "Брутто", "Штрафы", "Netto (после СК)"])
+    for w in row["weeks"]:
+        ws1.append([f'{w["week_start"]} – {w["week_end"]}', w["trips"], w["gross"], w["fines"], w["net"]])
+    ws1.append(["ИТОГО", row["trips"], row["gross"], row["fines"], row["net"]])
+    for i, wd in enumerate([26, 12, 14, 12, 18], start=1):
+        ws1.column_dimensions[ws1.cell(row=1, column=i).column_letter].width = wd
+
+    # ── Лист 2: реестр рейсов за всё время (стандартный формат) ──
+    ws2 = wb.create_sheet("Реестр рейсов")
+    ws2.append(EXPORT_HEADERS)
+    drivers = {d.id: d for d in session.exec(select(Driver)).all()}
+    trucks = {t.id: t for t in session.exec(select(Truck)).all()}
+    carrier_obj = next((c for c in session.exec(select(Carrier)).all() if (c.name or "").strip() == name), None)
+    sk = (carrier_obj.insurance_pct or 0.0) if carrier_obj else 0.0
+    ctrips = [t for t in session.exec(select(Trip)).all() if (t.carrier_name or t.source or "").strip() == name]
+    ctrips.sort(key=lambda t: t.dep_at or datetime.min)
+
+    def _fmt(dt):
+        return dt.strftime("%d.%m.%Y %H:%M:%S") if dt else ""
+
+    for t in ctrips:
+        drv = drivers.get(t.driver_id)
+        trk = trucks.get(t.truck_id)
+        driver_name = (drv.name if drv else "") or t.driver_name_raw or ""
+        truck_label = (trk.plate if trk else "") or t.plate_raw or ""
+        billing = (t.amount or 0) * (1 - sk / 100)   # Биллинг = сумма минус % СК
+        ws2.append([
+            t.source or "", t.carrier_name or "", t.request_number or "", t.status or "",
+            _fmt(t.dep_at), _fmt(t.end_at), t.tariff_type or "", driver_name, truck_label,
+            t.driver_phone or "", t.amount or 0, _round2(billing), t.fines or 0,
+        ])
+    for i, header in enumerate(EXPORT_HEADERS, start=1):
+        ws2.column_dimensions[ws2.cell(row=1, column=i).column_letter].width = max(14, len(header) + 2)
+
+    buf = BytesIO()
+    wb.save(buf)
+    safe = "".join(ch for ch in name if ch.isascii() and (ch.isalnum() or ch in " _-")).strip()[:40] or "perevozchik"
+    return Response(
+        content=buf.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="carrier_{safe}.xlsx"'},
+    )

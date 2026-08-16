@@ -32,6 +32,13 @@ export default function NewDashCarriers() {
   const [q, setQ] = useState("");
   const [dense, setDense] = useState(true);
   const [sorted, setSorted] = useState(false);
+  const [exporting, setExporting] = useState<string | null>(null);
+  async function exportCarrier(name: string) {
+    setExporting(name);
+    try { await api.download(`/api/carriers/balance/export?carrier=${encodeURIComponent(name)}`, `perevozchik_${name}.xlsx`); }
+    catch (e) { setError(e instanceof ApiError ? e.message : "Не удалось выгрузить"); }
+    finally { setExporting(null); }
+  }
   const resetSortRef = useRef<() => void>(() => {});
 
   useEffect(() => {
@@ -62,9 +69,15 @@ export default function NewDashCarriers() {
   const columns: Column<CarrierRow>[] = [
     { key: "carrier_name", label: "Перевозчик", type: "text", width: "minmax(180px, 1fr)", sticky: true, strong: true, sortValue: r => r.carrier_name,
       render: r => (
-        <span style={{ display: "inline-flex", alignItems: "baseline", gap: 6, minWidth: 0 }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, minWidth: 0 }}>
           <span style={{ fontWeight: 600 }}>{r.carrier_name}</span>
           {r.counterparty_name && <span className="muted" style={{ fontSize: 11.5, whiteSpace: "nowrap" }}>({r.counterparty_name})</span>}
+          <button type="button" className="icon-btn icon-btn--plain" title="Выгрузить в Excel (сводная + реестр рейсов)"
+            disabled={exporting === r.carrier_name}
+            onClick={e => { e.stopPropagation(); exportCarrier(r.carrier_name); }}
+            style={{ flexShrink: 0 }}>
+            <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round"><path d="M7.5 1.5v8" /><path d="M4.2 6.2 7.5 9.5l3.3-3.3" /><path d="M2.4 12.5h10.2" /></svg>
+          </button>
         </span>
       ) },
     { key: "trips", label: "Рейсов", type: "num", width: "80px", total: "sum" },
