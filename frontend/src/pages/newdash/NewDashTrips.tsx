@@ -6,6 +6,7 @@
  * Данные: /api/trips/ (+ drivers/trucks/carriers для фильтров и биллинга).
  */
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { api, ApiError } from "../../api";
 import { isoDate, money, uniqueSorted } from "../../lib/format";
 import NdMenu from "./NdMenu";
@@ -81,14 +82,25 @@ export default function NewDashTrips() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Начальные фильтры из URL (переход из Отчётов по клику на строку:
+  // ?from&to&driver&truck&carrier). Читаем один раз на маунте.
+  const [searchParams] = useSearchParams();
+  const [initP] = useState(() => ({
+    from: searchParams.get("from") || "",
+    to: searchParams.get("to") || "",
+    driver: searchParams.get("driver") || "",
+    truck: searchParams.get("truck") || "",
+    carrier: searchParams.get("carrier") || "",
+  }));
+
   const [q, setQ] = useState("");
   const [dense, setDense] = useState(true);
-  const [dateFrom, setDateFrom] = useState(() => isoDate(new Date(Date.now() - 60 * 864e5)));
-  const [dateTo, setDateTo] = useState(() => isoDate(new Date()));
+  const [dateFrom, setDateFrom] = useState(() => initP.from || isoDate(new Date(Date.now() - 60 * 864e5)));
+  const [dateTo, setDateTo] = useState(() => initP.to || isoDate(new Date()));
   const [statusF, setStatusF] = useState<Set<string>>(new Set());
-  const [driverF, setDriverF] = useState<Set<string>>(new Set());
-  const [truckF, setTruckF] = useState<Set<string>>(new Set());
-  const [carrierF, setCarrierF] = useState<Set<string>>(new Set());
+  const [driverF, setDriverF] = useState<Set<string>>(() => initP.driver ? new Set([initP.driver]) : new Set());
+  const [truckF, setTruckF] = useState<Set<string>>(() => initP.truck ? new Set([initP.truck]) : new Set());
+  const [carrierF, setCarrierF] = useState<Set<string>>(() => initP.carrier ? new Set([initP.carrier]) : new Set());
   const [onlyFines, setOnlyFines] = useState(false);
   const [sorted, setSorted] = useState(false);
   const resetSortRef = useRef<() => void>(() => {});
