@@ -557,7 +557,7 @@ export default function NewDashDrivers() {
             subtitle={`Выписка по балансу${range ? " · " + range : ""}`}
             avatar={(`${ledgerFor.last_name[0] || ""}${ledgerFor.first_name[0] || ""}` || "?").toUpperCase()}
             onClose={() => setLedgerFor(null)}
-            bodyStyle={{ overflow: "hidden" }}
+            bodyStyle={{ overflow: isPhone ? "auto" : "hidden" }}
             headExtra={
               <>
                 <div className="head-facts">

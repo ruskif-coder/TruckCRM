@@ -11,6 +11,7 @@ import { api } from "../../api";
 import { APP_VERSION } from "../../version";
 import { useAuth } from "../../auth/AuthContext";
 import { useTheme } from "../../theme/ThemeContext";
+import useSwipeNav from "./useSwipeNav";
 
 // Колокольчик рядом с названием раздела — когда внутри есть открытые заявки.
 const BellIcon = (
@@ -99,6 +100,9 @@ export default function NdMenu({ active }: { active: NavKey }) {
     mq.addEventListener("change", on);
     return () => mq.removeEventListener("change", on);
   }, []);
+
+  // Свайп влево/вправо между страницами (разделы + вкладки) — только телефон.
+  useSwipeNav(isPhone);
 
   // Ролевое сокрытие: админ-подпункты «Настроек» не-админам не показываем
   // (бэкенд всё равно гейтит, но нечего светить структуру и ловить лишние 403).

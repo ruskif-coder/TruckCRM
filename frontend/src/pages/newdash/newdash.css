@@ -1174,8 +1174,10 @@
   .nd .nd-fdrop__menu { max-width: calc(100vw - 24px); left: 0; right: auto; }
 
   /* ── Этап 5: дашборд — виджеты во всю ширину, KPI-плитки 2×2, табло скрыто ── */
-  .nd .workarea { grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 12px 12px calc(16px + env(safe-area-inset-bottom)); }
-  .nd .widget { grid-column: 1 / -1 !important; }
+  .nd .workarea { grid-template-columns: repeat(2, 1fr); grid-auto-rows: auto; grid-auto-flow: row dense; gap: 10px; padding: 12px 12px calc(16px + env(safe-area-inset-bottom)); }
+  /* Высоту строк на телефоне считаем по контенту, а не пиксельным row-span из JS
+     (он меряется под десктоп и на узкой колонке устаревает → виджеты наезжают). */
+  .nd .widget { grid-column: 1 / -1 !important; grid-row: auto !important; }
   .nd .widget.kpi { grid-column: auto !important; }  /* KPI — по 2 в ряд (2×2) */
   .nd .widget[data-wkey="main"] { display: none; }   /* табло рейсов — на телефоне прячем */
   .nd .workarea .w-handle, .nd .workarea .w-resize-x,
@@ -1358,4 +1360,17 @@
 @media (max-width: 640px) {
   .nd .main[data-pad="wide"] .summarystrip { padding-left: 12px; padding-right: 12px; }
   .nd .nd-pgnote { margin: 8px 12px 0; }
+
+  /* Формы в модалках — в одну колонку: на узком экране 2 колонки жмут поля,
+     и часть (напр. «Статья») визуально теряется. */
+  .nd .form-grid { grid-template-columns: 1fr; gap: 12px; }
+  .nd .form-grid__field--wide { grid-column: auto; }
+
+  /* Отчёты: блок примечаний после сводки съедает место под данные — прячем. */
+  .nd .nd-pgnote { display: none; }
+
+  /* Биллинг перевозчика: период (даты) переносим в 2 строки, чтобы влезли все
+     колонки таблицы недель. */
+  .nd .bill-week { align-items: start; }
+  .nd .bill-week__period { white-space: normal; line-height: 1.25; }
 }
