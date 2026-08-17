@@ -12,6 +12,7 @@ import { APP_VERSION } from "../../version";
 import { useAuth } from "../../auth/AuthContext";
 import { useTheme } from "../../theme/ThemeContext";
 import useSwipeNav from "./useSwipeNav";
+import NdBurgerFab from "./NdBurgerFab";
 
 // Колокольчик рядом с названием раздела — когда внутри есть открытые заявки.
 const BellIcon = (
@@ -132,9 +133,9 @@ export default function NdMenu({ active }: { active: NavKey }) {
     it.key === active || pathname === it.to || (it.children?.some(c => pathname === c.to) ?? false);
 
   // ── Телефон: нижний таб-бар (4 раздела + «Ещё») и лист «Ещё» снизу ──
-  // Телефон: боковое меню/таб-бар не рендерим — навигация через бургер шапки
-  // (NdPhoneHead → NdNavSheet, лист «Все разделы»).
-  if (isPhone) return null;
+  // Телефон: боковое меню/таб-бар не рендерим — навигация через плавающий бургер
+  // (NdBurgerFab, правый нижний угол → лист «Все разделы») + свайп между страницами.
+  if (isPhone) return <NdBurgerFab />;
 
   return (
     <div className="menu-slot" data-pinned={pinned}>

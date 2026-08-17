@@ -28,8 +28,11 @@ function buildFlatPages(isAdmin: boolean): string[] {
 const MIN_DX = 70;      // порог горизонтали, px
 const MAX_DT = 600;     // максимум времени жеста, мс
 const H_RATIO = 2;      // |dx| должен быть >= |dy| * H_RATIO (уверенно горизонтальный)
-// Зоны, где свайп НЕ должен листать страницы (собственный горизонтальный скролл/ввод).
-const IGNORE_SEL = ".table-scroll, .segments, .nd-fdrop, input, textarea, select, [data-noswipe]";
+// Зоны, где свайп НЕ должен листать страницы: только реально горизонтально-
+// скроллящиеся (лента вкладок), дропдаун и поля ввода. ВАЖНО: список карточек на
+// телефоне обёрнут в .table-scroll, но скроллится вертикально — его НЕ игнорируем,
+// иначе свайп не работает в нижней (табличной) части экрана.
+const IGNORE_SEL = ".segments, .nd-fdrop, input, textarea, select, [data-noswipe]";
 // Открытые оверлеи — при них навигацию не трогаем.
 const OVERLAY_SEL = ".nd-overlay, .nd-msheet, .nd-fsheet";
 
