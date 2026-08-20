@@ -42,6 +42,11 @@ export type WeeklyTotals = {
   driver_payout: number;
   profit: number;
   profitability: number | null;
+  // Сводная вкладка «Чистый поток по неделям» (2026-08): прочие расходы по
+  // реестру за неделю (без топлива и расчёта с водителем) и итоговый чистый
+  // поток = net − fines − fuel − driver_payout − registry_other_expense.
+  registry_other_expense: number;
+  clean_flow: number;
 };
 
 export type WeeklyWeek = { week_start: string; week_end: string; rows: WeeklyRow[]; totals: WeeklyTotals };

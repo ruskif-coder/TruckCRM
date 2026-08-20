@@ -42,6 +42,11 @@ _staff = [Depends(require_zone("dashboard", "read"))]
 TREND_WEEKS = 8
 TOP_TRUCKS = 8
 
+# Категории CashFlow, которые НЕ входят в «прочие расходы» сводной вкладки
+# «Чистый поток по неделям»: топливо и расчёт с водителем уже учтены отдельно
+# (из weekly_pnl), иначе они задвоятся. См. /weekly ниже.
+_CLEANFLOW_EXCLUDE = {"Топливо", "Расчёт с водителем"}
+
 
 def get_settings(session: Session) -> models.Settings:
     settings = session.get(models.Settings, 1)
@@ -477,6 +482,19 @@ def weekly(
         for k in ("gross", "commission_rub", "net", "fines", "toll", "fuel", "driver_payout", "profit"):
             totals[k] = round2(totals[k])
         totals["profitability"] = (totals["profit"] / totals["net"]) if totals["net"] else None
+        # Сводная вкладка «Чистый поток по неделям»: прочие расходы по реестру за
+        # неделю (CashFlowEntry) БЕЗ категорий «Топливо» и «Расчёт с водителем» —
+        # они уже вычтены из fuel/driver_payout (из расчёта), иначе двойной счёт.
+        # Чистый поток = Netto − Штрафы − Топливо − Выплаты водителям − Проч.расходы.
+        registry_other = sum(
+            (e.expense or 0)
+            for e in cash_flow_entries
+            if cashflow_in_range(e, b["week_start"], b["week_end"]) and (e.category or "") not in _CLEANFLOW_EXCLUDE
+        )
+        totals["registry_other_expense"] = round2(registry_other)
+        totals["clean_flow"] = round2(
+            totals["net"] - totals["fines"] - totals["fuel"] - totals["driver_payout"] - registry_other
+        )
         result_weeks.append(
             {
                 "week_start": b["week_start"],

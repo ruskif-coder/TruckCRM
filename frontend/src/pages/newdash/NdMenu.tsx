@@ -64,6 +64,7 @@ export const NAV: NavItem[] = [
     icon: <svg {...svgProps}><rect x="3" y="2" width="12" height="14" rx="2" /><path d="M6 6h6" /><path d="M6 9h6" /><path d="M6 12h3.5" /></svg>,
     children: [
       { label: "P&L по машинам", to: "/newdash/reports" },
+      { label: "Сводка по неделям", to: "/newdash/reports/summary" },
       { label: "Перевозчики", to: "/newdash/reports/carriers" },
     ],
   },

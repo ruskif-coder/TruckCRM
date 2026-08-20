@@ -24,6 +24,7 @@ export const FINANCE_TABS: SectionTab[] = [
 // Вкладки раздела «Отчёты»
 export const REPORTS_TABS: SectionTab[] = [
   { label: "Отчёты", to: "/newdash/reports" },
+  { label: "Сводка по неделям", to: "/newdash/reports/summary" },
   { label: "Перевозчики", to: "/newdash/reports/carriers" },
 ];
 

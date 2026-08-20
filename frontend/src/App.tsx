@@ -20,6 +20,7 @@ import NewDashExpenses from "./pages/newdash/NewDashExpenses";
 import NewDashFuel from "./pages/newdash/NewDashFuel";
 import NewDashClaims from "./pages/newdash/NewDashClaims";
 import NewDashReports from "./pages/newdash/NewDashReports";
+import NewDashReportsSummary from "./pages/newdash/NewDashReportsSummary";
 import NewDashCarriers from "./pages/newdash/NewDashCarriers";
 import NewDashRefCarriers from "./pages/newdash/NewDashRefCarriers";
 import NewDashCounterparties from "./pages/newdash/NewDashCounterparties";
@@ -174,6 +175,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <NewDashReports />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/newdash/reports/summary"
+            element={
+              <ProtectedRoute>
+                <NewDashReportsSummary />
               </ProtectedRoute>
             }
           />
