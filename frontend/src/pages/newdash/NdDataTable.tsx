@@ -296,7 +296,7 @@ export default function NdDataTable<R extends Row = Row>(props: NdDataTableProps
                         onClick={() => { if (expand) toggleExpand(id); else onRowClick?.(r, api); }}
                         selectable={select} selected={sel.has(id)} onToggle={() => toggle(id)}
                       />
-                      {opened && expand && <div className="nd-ecard" style={{ paddingTop: 4 }}>{expand(r)}</div>}
+                      {opened && expand && <div className="nd-ecard nd-expand-scroll" style={{ paddingTop: 4 }}>{expand(r)}</div>}
                     </Fragment>
                   );
                 })}
@@ -383,7 +383,7 @@ export default function NdDataTable<R extends Row = Row>(props: NdDataTableProps
                         })}
                       </div>
                       {opened && expand && (
-                        <div className="table__expand"><div style={{ padding: "16px 0" }}>{expand(r)}</div></div>
+                        <div className="table__expand"><div className="nd-expand-scroll" style={{ padding: "16px 0" }}>{expand(r)}</div></div>
                       )}
                     </Fragment>
                   );

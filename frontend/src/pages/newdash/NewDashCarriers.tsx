@@ -18,7 +18,7 @@ import type { Column } from "./NdDataTable";
 import { shortDate as sd, NdSearch, useIsPhone } from "./shared";
 import "./newdash.css";
 
-type CarrierWeek = { week_start: string; week_end: string; trips: number; gross: number; fines: number; net: number };
+type CarrierWeek = { week_start: string; week_end: string; trips: number; gross: number; fines: number; net: number; income: number };
 type CarrierRow = {
   carrier_name: string;
   carrier_id: number | null;
@@ -39,9 +39,16 @@ export default function NewDashCarriers() {
   const isPhone = useIsPhone();
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [billingFor, setBillingFor] = useState<CarrierRow | null>(null);   // модалка биллинга по неделям
-  async function exportCarrier(name: string) {
+  // Метка «дата_время» в конец имени файла выгрузки (YYYY-MM-DD_HH-mm).
+  function stamp(): string {
+    const d = new Date(); const p = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}_${p(d.getHours())}-${p(d.getMinutes())}`;
+  }
+  // Недельная выгрузка «как в реестре перевозчика»: книга Сводная + вкладки по
+  // неделям отчётности (рейс — в report_week, штраф — в fines_report_week).
+  async function exportCarrierWeekly(name: string) {
     setExporting(name);
-    try { await api.download(`/api/carriers/balance/export?carrier=${encodeURIComponent(name)}`, `perevozchik_${name}.xlsx`); }
+    try { await api.download(`/api/carriers/balance/weekly-export?carrier=${encodeURIComponent(name)}`, `perevozchik_nedeli_${name}_${stamp()}.xlsx`); }
     catch (e) { setError(e instanceof ApiError ? e.message : "Не удалось выгрузить"); }
     finally { setExporting(null); }
   }
@@ -55,7 +62,7 @@ export default function NewDashCarriers() {
         ...r,
         gross: Math.round(r.gross), fines: Math.round(r.fines), net: Math.round(r.net),
         paid: Math.round(r.paid), balance: Math.round(r.balance),
-        weeks: r.weeks.map(w => ({ ...w, gross: Math.round(w.gross), fines: Math.round(w.fines), net: Math.round(w.net) })),
+        weeks: r.weeks.map(w => ({ ...w, gross: Math.round(w.gross), fines: Math.round(w.fines), net: Math.round(w.net), income: Math.round(w.income || 0) })),
       }))); })
       .catch(err => { if (!cancelled) setError(err instanceof ApiError ? err.message : "Ошибка загрузки"); })
       .finally(() => { if (!cancelled) setLoading(false); });
@@ -78,9 +85,9 @@ export default function NewDashCarriers() {
         <span style={{ display: "inline-flex", alignItems: "center", gap: 6, minWidth: 0 }}>
           <span style={{ fontWeight: 600 }}>{r.carrier_name}</span>
           {r.counterparty_name && <span className="muted" style={{ fontSize: 11.5, whiteSpace: "nowrap" }}>({r.counterparty_name})</span>}
-          <button type="button" className="icon-btn icon-btn--plain" title="Выгрузить в Excel (сводная + реестр рейсов)"
+          <button type="button" className="icon-btn icon-btn--plain" title="Выгрузка по неделям (Excel)"
             disabled={exporting === r.carrier_name}
-            onClick={e => { e.stopPropagation(); exportCarrier(r.carrier_name); }}
+            onClick={e => { e.stopPropagation(); exportCarrierWeekly(r.carrier_name); }}
             style={{ flexShrink: 0 }}>
             <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round"><path d="M7.5 1.5v8" /><path d="M4.2 6.2 7.5 9.5l3.3-3.3" /><path d="M2.4 12.5h10.2" /></svg>
           </button>
@@ -165,64 +172,82 @@ export default function NewDashCarriers() {
               ],
               actions: <>
                 <button type="button" className="btn btn--primary" style={{ flex: 1 }} onClick={() => setBillingFor(r)}>Биллинг</button>
-                <button type="button" className="btn btn--ghost" style={{ flex: 1 }} disabled={exporting === r.carrier_name} onClick={() => exportCarrier(r.carrier_name)}>Excel</button>
+                <button type="button" className="btn btn--ghost" style={{ flex: 1 }} disabled={exporting === r.carrier_name} onClick={() => exportCarrierWeekly(r.carrier_name)}>Excel</button>
               </>,
             })}
             empty={error ? "Не удалось загрузить" : "Рейсов с перевозчиком нет"}
             emptyHint={error ? "Проверьте доступ и повторите" : "Укажите перевозчика в рейсах"}
-            expand={r => (
+            expand={r => {
+              // Накопительный остаток по неделям: Σ(Netto − Поступления) нарастающим итогом.
+              let acc = 0;
+              const wks = r.weeks.map(w => { acc += w.net - (w.income || 0); return { ...w, cum: acc }; });
+              return (
               <div style={{ padding: "0 0 4px 40px" }}>
-                <div style={{ display: "grid", gridTemplateColumns: "minmax(160px,auto) repeat(4, minmax(84px,auto))", gap: "6px 24px", fontSize: 12.5, width: "fit-content" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "minmax(160px,auto) repeat(6, minmax(84px,auto))", gap: "6px 24px", fontSize: 12.5, width: "fit-content" }}>
                   <div className="muted" style={{ fontWeight: 600 }}>Неделя</div>
                   <div className="muted" style={{ fontWeight: 600, textAlign: "right" }}>Рейсов</div>
                   <div className="muted" style={{ fontWeight: 600, textAlign: "right" }}>Брутто</div>
                   <div className="muted" style={{ fontWeight: 600, textAlign: "right" }}>Штрафы</div>
                   <div className="muted" style={{ fontWeight: 600, textAlign: "right" }}>Netto (после СК)</div>
-                  {r.weeks.map(w => (
+                  <div className="muted" style={{ fontWeight: 600, textAlign: "right" }}>Поступления</div>
+                  <div className="muted" style={{ fontWeight: 600, textAlign: "right" }}>Накопит. остаток</div>
+                  {wks.map(w => (
                     <Fragment key={w.week_start}>
                       <div style={{ whiteSpace: "nowrap" }}>{sd(w.week_start)} – {sd(w.week_end)}</div>
                       <div style={{ textAlign: "right", fontFamily: "var(--font-mono)" }}>{w.trips}</div>
                       <div style={{ textAlign: "right", fontFamily: "var(--font-mono)" }}>{money(w.gross)}</div>
                       <div style={{ textAlign: "right", fontFamily: "var(--font-mono)", color: w.fines ? "var(--danger)" : undefined }}>{w.fines ? money(w.fines) : "—"}</div>
                       <div style={{ textAlign: "right", fontFamily: "var(--font-mono)" }}>{money(w.net)}</div>
+                      <div style={{ textAlign: "right", fontFamily: "var(--font-mono)", color: w.income ? "var(--success-strong)" : "var(--text-3)" }}>{w.income ? money(w.income) : "—"}</div>
+                      <div style={{ textAlign: "right", fontFamily: "var(--font-mono)", fontWeight: 600, color: w.cum < 0 ? "var(--success-strong)" : "var(--danger)" }}>{money(w.cum)}</div>
                     </Fragment>
                   ))}
                 </div>
               </div>
-            )}
+              );
+            }}
           />
         </div>
       </main>
 
-      {billingFor && (
+      {billingFor && (() => {
+        // Накопительный остаток по неделям: Σ(Netto − Поступления) нарастающим итогом.
+        let acc = 0;
+        const wks = billingFor.weeks.map(w => { acc += w.net - (w.income || 0); return { ...w, cum: acc }; });
+        return (
         <NdModal size="sheet" title={billingFor.carrier_name}
           subtitle={`Биллинг по неделям · баланс ${money(billingFor.balance)}`}
           onClose={() => setBillingFor(null)}
           actions={[
-            { label: "Выгрузить в Excel", kind: "ghost", onClick: () => exportCarrier(billingFor.carrier_name) },
+            { label: "Выгрузить в Excel", kind: "accent", onClick: () => exportCarrierWeekly(billingFor.carrier_name) },
             { label: "Закрыть", kind: "primary", grow: true, onClick: () => setBillingFor(null) },
           ]}>
           <div className="bill-week bill-week--head">
-            <span>Неделя</span><span>Рейсов</span><span>Брутто</span><span>Штрафы</span><span>Netto</span>
+            <span>Неделя</span><span>Рейсов</span><span>Брутто</span><span>Штрафы</span><span>Netto</span><span>Поступл.</span><span>Остаток</span>
           </div>
-          {billingFor.weeks.length === 0 ? (
+          {wks.length === 0 ? (
             <div className="t-body-s muted" style={{ padding: "16px 0", textAlign: "center" }}>Нет данных по неделям</div>
-          ) : billingFor.weeks.map(w => (
+          ) : wks.map(w => (
             <div className="bill-week" key={w.week_start}>
               <span className="bill-week__period">{sd(w.week_start)} – {sd(w.week_end)}</span>
               <span>{w.trips}</span>
               <span>{money(w.gross)}</span>
               <span style={{ color: w.fines ? "var(--danger)" : "var(--text-3)" }}>{w.fines ? money(w.fines) : "—"}</span>
               <span className="bill-week__net">{money(w.net)}</span>
+              <span style={{ color: w.income ? "var(--success-strong)" : "var(--text-3)" }}>{w.income ? money(w.income) : "—"}</span>
+              <span style={{ fontWeight: 600, color: w.cum < 0 ? "var(--success-strong)" : "var(--danger)" }}>{money(w.cum)}</span>
             </div>
           ))}
           <div className="bill-week bill-week--total">
             <span>ИТОГО</span><span>{billingFor.trips}</span><span>{money(billingFor.gross)}</span>
             <span style={{ color: billingFor.fines ? "var(--danger)" : "var(--text-3)" }}>{billingFor.fines ? money(billingFor.fines) : "—"}</span>
             <span className="bill-week__net">{money(billingFor.net)}</span>
+            <span style={{ color: "var(--success-strong)" }}>{money(billingFor.paid)}</span>
+            <span style={{ fontWeight: 600, color: billingFor.balance < 0 ? "var(--success-strong)" : "var(--danger)" }}>{money(billingFor.balance)}</span>
           </div>
         </NdModal>
-      )}
+        );
+      })()}
     </div>
   );
 }

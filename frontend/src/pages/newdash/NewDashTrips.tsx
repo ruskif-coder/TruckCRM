@@ -19,6 +19,7 @@ import NdPhoneHead from "./NdPhoneHead";
 import NdModal from "./NdModal";
 import NdDataTable from "./NdDataTable";
 import type { Column } from "./NdDataTable";
+import { useAuth } from "../../auth/AuthContext";
 import { fmtDateTime, NdSearch, useIsPhone } from "./shared";
 import "./newdash.css";
 
@@ -118,8 +119,15 @@ export default function NewDashTrips() {
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importSource, setImportSource] = useState(SOURCES[0]);
   const [importCarrier, setImportCarrier] = useState("");
+  // Неделя отчётности загрузки: по умолчанию понедельник текущей недели.
+  const [importWeek, setImportWeek] = useState(() => {
+    const d = new Date(); const day = (d.getDay() + 6) % 7; d.setDate(d.getDate() - day);
+    return isoDate(d);
+  });
   const [importing, setImporting] = useState(false);
   const [importSummary, setImportSummary] = useState<ImportSummary | null>(null);
+  const [backfillMsg, setBackfillMsg] = useState<string | null>(null);
+  const { user } = useAuth();
   const [busy, setBusy] = useState<string | null>(null);
 
   useEffect(() => {
@@ -214,11 +222,24 @@ export default function NewDashTrips() {
     if (!importFile) return;
     setImporting(true); setError(null); setImportSummary(null);
     try {
-      const res = await api.upload<ImportSummary>("/api/trips/import", importFile, { source: importSource, carrier_name: importCarrier });
+      const res = await api.upload<ImportSummary>("/api/trips/import", importFile, { source: importSource, carrier_name: importCarrier, report_week: importWeek });
       setImportSummary(res);
       setImportFile(null);
       await reloadAll();
     } catch (e) { setError(e instanceof ApiError ? e.message : "Ошибка импорта"); }
+    finally { setImporting(false); }
+  }
+
+  // Разовый исторический бэкфилл недель отчётности из недельного файла-реестра
+  // (admin). Ставит report_week/fines_report_week на существующие рейсы по № заявки.
+  async function handleBackfill() {
+    if (!importFile) return;
+    setImporting(true); setError(null); setBackfillMsg(null);
+    try {
+      const r = await api.upload<{ sheets_parsed: number; requests_in_file: number; trips_report_week_set: number; trips_fines_week_set: number; fines_in_separate_week: number }>("/api/maintenance/backfill-report-weeks", importFile);
+      setBackfillMsg(`Разложено: вкладок-недель ${r.sheets_parsed}, рейсов в файле ${r.requests_in_file}, проставлено report_week ${r.trips_report_week_set}, штраф-недель ${r.trips_fines_week_set} (штраф в отдельной неделе: ${r.fines_in_separate_week}).`);
+      await reloadAll();
+    } catch (e) { setError(e instanceof ApiError ? e.message : "Ошибка бэкфилла"); }
     finally { setImporting(false); }
   }
 
@@ -401,10 +422,25 @@ export default function NewDashTrips() {
                 </select>
               </div>
               <div className="field">
+                <span className="field__label">Неделя отчётности</span>
+                <input type="date" className="field__input" value={importWeek} onChange={e => setImportWeek(e.target.value)} />
+                <span className="t-caption muted" style={{ marginTop: 4 }}>Рейсы и штрафы этой загрузки отнесутся к неделе, в которую попадает выбранная дата (для выгрузки по перевозчику).</span>
+              </div>
+              <div className="field">
                 <span className="field__label">Файл реестра</span>
                 <input type="file" accept=".xlsx" onChange={e => setImportFile(e.target.files?.[0] || null)}
                   style={{ font: "400 12.5px var(--font-ui)", color: "var(--ink)" }} />
               </div>
+              {user?.role === "admin" && importFile && (
+                <div className="field" style={{ borderTop: "1px solid var(--line)", paddingTop: 10 }}>
+                  <span className="field__label">Бэкфилл истории (админ)</span>
+                  <button type="button" className="btn btn--ghost" disabled={importing} onClick={handleBackfill} style={{ alignSelf: "flex-start" }}>
+                    Разложить по неделям из этого файла
+                  </button>
+                  <span className="t-caption muted" style={{ marginTop: 4 }}>Для недельного файла-реестра: проставит неделю отчётности существующим рейсам по № заявки (не создаёт рейсы).</span>
+                  {backfillMsg && <div className="t-caption" style={{ color: "var(--success-strong)", marginTop: 4 }}>{backfillMsg}</div>}
+                </div>
+              )}
               {error && <div className="field__error">{error}</div>}
             </>
           )}

@@ -23,7 +23,7 @@ from sqlmodel import Session, select
 from .. import models
 from ..auth import get_current_user
 from ..database import get_session
-from ..importers.trip_registry import EXPORT_HEADERS
+from ..importers.trip_registry import EXPORT_HEADERS, build_carrier_weekly_export
 from ..models import Carrier, CashFlowEntry, Counterparty, Driver, Trip, Truck
 
 router = APIRouter(prefix="/api/carriers/balance", tags=["carrier-balance"])
@@ -41,6 +41,11 @@ def _require_staff(user: models.User = Depends(get_current_user)) -> models.User
 
 def _iso_week_monday(d: date_type) -> date_type:
     return d - timedelta(days=d.weekday())
+
+
+def _as_date(v) -> date_type:
+    """CashFlowEntry.date/Trip.dep_at могут прийти как date или datetime — нормализуем."""
+    return v.date() if isinstance(v, datetime) else v
 
 
 def _round2(v: float) -> float:
@@ -88,40 +93,52 @@ def carrier_balance_summary(
             week_buckets[key]["trips"] += 1
         week_buckets[key]["fines"] += t.fines or 0  # штрафы — всегда
 
-    # Агрегируем по неделям
+    # Поступления по неделям: CashFlowEntry.income от контрагента перевозчика,
+    # ПРИВЯЗКА К ДАТЕ ПЛАТЕЖА (entry.date), а не к неделе рейса.
+    carrier_paid: dict[str, float] = defaultdict(float)            # всего (накопительно)
+    carrier_week_income: dict = defaultdict(float)                 # (name, wk) -> сумма
+    for entry in cashflow:
+        if not (entry.income and entry.income > 0):
+            continue
+        cp_text = (entry.counterparty or "").strip()
+        names = cp_name_to_carriers.get(cp_text, [])
+        wk = _iso_week_monday(_as_date(entry.date)) if entry.date else None
+        for carrier_name in names:
+            carrier_paid[carrier_name] += entry.income
+            if wk is not None:
+                carrier_week_income[(carrier_name, wk)] += entry.income
+
+    # Агрегируем по неделям — объединяем недели рейсов и недели поступлений.
     carrier_net: dict[str, float] = defaultdict(float)
     carrier_gross: dict[str, float] = defaultdict(float)
     carrier_fines: dict[str, float] = defaultdict(float)
     carrier_trips: dict[str, int] = defaultdict(int)
-    carrier_weeks: dict[str, list] = defaultdict(list)
+    carrier_week_map: dict[str, dict] = defaultdict(dict)          # name -> {wk: week_dict}
+
+    def _week_slot(name, wk):
+        slot = carrier_week_map[name].get(wk)
+        if slot is None:
+            slot = {
+                "week_start": wk.isoformat(), "week_end": (wk + timedelta(days=6)).isoformat(),
+                "trips": 0, "gross": 0.0, "fines": 0.0, "net": 0.0, "income": 0.0,
+            }
+            carrier_week_map[name][wk] = slot
+        return slot
 
     for (name, wk), g in week_buckets.items():
         carrier = carrier_by_name.get(name)
         sk_pct = (carrier.insurance_pct or 0.0) if carrier else 0.0
-        gross = g["gross"]
-        fines = g["fines"]
+        gross = g["gross"]; fines = g["fines"]
         net = (gross - fines) * (1 - sk_pct / 100)
         carrier_net[name] += net
         carrier_gross[name] += gross
         carrier_fines[name] += fines
         carrier_trips[name] += g["trips"]
-        carrier_weeks[name].append({
-            "week_start": wk.isoformat(),
-            "week_end": (wk + timedelta(days=6)).isoformat(),
-            "trips": g["trips"],
-            "gross": _round2(gross),
-            "fines": _round2(fines),
-            "net": _round2(net),
-        })
+        slot = _week_slot(name, wk)
+        slot.update(trips=g["trips"], gross=_round2(gross), fines=_round2(fines), net=_round2(net))
 
-    # Поступления: CashFlowEntry.income где counterparty совпадает с контрагентом перевозчика
-    carrier_paid: dict[str, float] = defaultdict(float)
-    for entry in cashflow:
-        if not (entry.income and entry.income > 0):
-            continue
-        cp_text = (entry.counterparty or "").strip()
-        for carrier_name in cp_name_to_carriers.get(cp_text, []):
-            carrier_paid[carrier_name] += entry.income
+    for (name, wk), inc in carrier_week_income.items():
+        _week_slot(name, wk)["income"] = _round2(inc)
 
     # Собираем итог — перевозчики с рейсами + перевозчики с поступлениями
     processed_names: set = set(carrier_gross.keys()) | set(carrier_paid.keys())
@@ -136,7 +153,7 @@ def carrier_balance_summary(
         net = carrier_net.get(name, 0.0)
         paid = carrier_paid.get(name, 0.0)
         balance = net - paid
-        weeks = sorted(carrier_weeks.get(name, []), key=lambda w: w["week_start"])
+        weeks = sorted(carrier_week_map.get(name, {}).values(), key=lambda w: w["week_start"])
         result.append({
             "carrier_name": name,
             "carrier_id": carrier.id if carrier else None,
@@ -229,4 +246,63 @@ def carrier_export(
         content=buf.getvalue(),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f'attachment; filename="carrier_{safe}.xlsx"'},
+    )
+
+
+@router.get("/weekly-export")
+def carrier_weekly_export(
+    carrier: str = Query(..., description="Имя перевозчика"),
+    session: Session = Depends(get_session),
+    _user: models.User = Depends(_require_staff),
+):
+    """XLSX по перевозчику «как в реестре перевозчика»: «Сводная» + вкладка на
+    каждую неделю отчётности. Рейс попадает в неделю report_week, штраф — в
+    неделю fines_report_week (учёт перевозчика по неделе поступления реестра, а
+    не по факт. дате). Недели проставляются импортом («Неделя отчётности») или
+    историческим бэкфиллом (/api/maintenance/backfill-report-weeks)."""
+    name = carrier.strip()
+    drivers = {d.id: d for d in session.exec(select(Driver)).all()}
+    trucks = {t.id: t for t in session.exec(select(Truck)).all()}
+    ctrips = [t for t in session.exec(select(Trip)).all() if (t.carrier_name or t.source or "").strip() == name]
+    if not ctrips:
+        raise HTTPException(404, "Перевозчик не найден или нет рейсов")
+
+    rows = []
+    for t in ctrips:
+        drv = drivers.get(t.driver_id)
+        trk = trucks.get(t.truck_id)
+        # Неделя отчётности: если не проставлена (нет бэкфилла/импорта с неделей) —
+        # фолбэк на неделю по дате отгрузки/окончания, чтобы книга не была пустой.
+        base = t.dep_at or t.end_at
+        fallback = _iso_week_monday(base.date()) if base else None
+        rw = t.report_week or fallback
+        fw = t.fines_report_week or rw
+        rows.append({
+            "request_number": t.request_number, "external_request_number": t.external_request_number or "",
+            "tariff_type": t.tariff_type or "", "plate": (trk.plate if trk else "") or t.plate_raw or "",
+            "driver": (drv.name if drv else "") or t.driver_name_raw or "", "driver_phone": t.driver_phone or "",
+            "confirmed_at": t.confirmed_at, "status": t.status or "", "dep_at": t.dep_at, "end_at": t.end_at,
+            "amount": t.amount or 0, "fines": t.fines or 0,
+            "report_week": rw, "fines_report_week": fw,
+        })
+    # Поступления по неделям от привязанного контрагента (по дате платежа).
+    carrier_obj = next((c for c in session.exec(select(Carrier)).all() if (c.name or "").strip() == name), None)
+    cp_name = None
+    if carrier_obj and carrier_obj.counterparty_id:
+        cp = session.get(Counterparty, carrier_obj.counterparty_id)
+        cp_name = (cp.name or "").strip() if cp else None
+    income_by_week: dict = {}
+    if cp_name:
+        for e in session.exec(select(CashFlowEntry)).all():
+            if e.income and e.income > 0 and (e.counterparty or "").strip() == cp_name and e.date:
+                wk = _iso_week_monday(_as_date(e.date))
+                income_by_week[wk] = income_by_week.get(wk, 0) + e.income
+
+    sk_pct = (carrier_obj.insurance_pct or 0.0) if carrier_obj else 0.0
+    data = build_carrier_weekly_export(name, rows, income_by_week, sk_pct)
+    safe = "".join(ch for ch in name if ch.isascii() and (ch.isalnum() or ch in " _-")).strip()[:40] or "perevozchik"
+    return Response(
+        content=data,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="carrier_weekly_{safe}.xlsx"'},
     )

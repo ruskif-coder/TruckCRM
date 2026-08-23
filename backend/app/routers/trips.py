@@ -1,3 +1,4 @@
+from datetime import date as _date, timedelta as _timedelta
 from typing import List
 
 from fastapi import Depends, File, Form, HTTPException, UploadFile
@@ -34,11 +35,19 @@ async def import_trips_endpoint(
     file: UploadFile = File(...),
     source: str = Form(""),
     carrier_name: str = Form(""),
+    report_week: str = Form(""),   # YYYY-MM-DD; снапим к понедельнику ISO-недели
     session: Session = Depends(get_session),
     user: models.User = Depends(get_current_user),
 ):
     content = await file.read()
-    result = import_trips(content, session, source=source, carrier_name=carrier_name)
+    rw = None
+    if report_week:
+        try:
+            d = _date.fromisoformat(report_week)
+            rw = d - _timedelta(days=d.weekday())   # понедельник недели
+        except ValueError:
+            rw = None
+    result = import_trips(content, session, source=source, carrier_name=carrier_name, report_week=rw)
     # Массовый импорт - одна сводная запись в журнале (счётчики из ответа
     # импортёра), а не построчный дифф на каждый рейс: при импорте реестра
     # это сотни строк за раз, и для журнала действий важнее факт и масштаб

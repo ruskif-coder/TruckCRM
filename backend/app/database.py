@@ -35,6 +35,10 @@ _PENDING_COLUMNS: dict[str, list[tuple[str, str, str]]] = {
         # Added 2026-06-26 for the "Штраф" column the user added to the
         # import template (see models.TripBase.fines).
         ("fines", "FLOAT", "0"),
+        # Added 2026-08-20: неделя отчётности (понедельник) для выгрузки по
+        # перевозчику — см. models.TripBase.report_week/fines_report_week.
+        ("report_week", "DATE", "NULL"),
+        ("fines_report_week", "DATE", "NULL"),
     ],
     # Added 2026-06-23 for the Автомобили admin form (see models.TruckBase).
     # `truck` already has 3 real rows (auto-created by the importers with

@@ -42,8 +42,11 @@ reference data. Same matching/auto-create is reused by import_trips().
 from collections import Counter, defaultdict
 from datetime import date, datetime, timedelta
 from io import BytesIO
+from typing import Optional
 
 import openpyxl
+from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.utils import get_column_letter
 from sqlmodel import Session, select
 
 from .. import models
@@ -163,6 +166,191 @@ def build_trips_export(rows: list) -> bytes:
     return buf.getvalue()
 
 
+# ── Недельная выгрузка по перевозчику (2026-08-20) ───────────────────────────
+# Книга как в присланном пользователем файле «...финал согласно реестрам»:
+# «Сводная» + вкладка на каждую неделю отчётности. Рейс попадает в неделю своего
+# report_week, штраф — в неделю fines_report_week (может отличаться: у перевозчика
+# учёт по неделе ПОСТУПЛЕНИЯ реестра/штрафа, а не по фактической дате рейса).
+WEEKLY_EXPORT_HEADERS = [
+    "№ заявки", "Внешний № заявки", "Тип тарификации", "гос. Номер ТС",
+    "ФИО водителя", "Телефон водителя", "Дата\\время подтверждения заявки (МСК)",
+    "Статус заявки", "Дата отгрузки (Часовой пояс точки)", "Дата окончания рейса",
+    "Сумма транзакций", "Штраф", "Примечание",
+]
+
+
+def _week_label(monday: date) -> str:
+    iso = monday.isocalendar()[1]
+    end = monday + timedelta(days=6)
+    return f"Н{iso} ({monday.strftime('%d.%m')}-{end.strftime('%d.%m')})"
+
+
+# Оформление под шаблон пользователя «...финал согласно реестрам»
+_HDR_FILL = PatternFill("solid", fgColor="1F3864")      # тёмно-синий заголовок
+_HDR_FONT = Font(bold=True, color="FFFFFF")
+_TOT_FILL = PatternFill("solid", fgColor="D9E1F2")      # светло-синий «ИТОГ НЕДЕЛИ»
+_PARAM_FILL = PatternFill("solid", fgColor="FFF2CC")    # жёлтая ячейка «Ставка»
+_CENTER = Alignment(horizontal="center", vertical="center", wrap_text=True)
+_MONEY = "#,##0.00"
+_CNT = "0"
+_PCT = "0%"
+_DTF = "dd\\.mm\\.yyyy\\ hh:mm"
+
+
+def build_carrier_weekly_export(carrier_name: str, rows: list, income_by_week: Optional[dict] = None, sk_pct: float = 0.0) -> bytes:
+    """Книга как в шаблоне пользователя, НА ФОРМУЛАХ (не статика):
+    - вкладка на каждую неделю отчётности: рейсы (A–M) + блок «ИТОГ НЕДЕЛИ» в
+      столбцах O/P с формулами COUNTIF/SUM по данным этой вкладки;
+    - «Сводная» ссылается на итоговые ячейки вкладок (=Нxx!$P$*), считает
+      Итого/К выплате через жёлтый параметр «Ставка к выплате» (C3 = 1 − СК%),
+      Поступления (по дате платежа) и Накопит. остаток формулами.
+    Правка данных в неделе пересчитывает всю сводную.
+    rows — dict'ы (см. ключи ниже). income_by_week — {понедельник: сумма}."""
+    income_by_week = income_by_week or {}
+    weeks: dict = {}
+
+    def wk(monday):
+        return weeks.setdefault(monday, {"trips": [], "fines": []})
+
+    for r in rows:
+        rw = r.get("report_week")
+        fw = r.get("fines_report_week") or rw
+        if rw is None:
+            continue
+        fine = r.get("fines") or 0
+        fine_elsewhere = fine and fw is not None and fw != rw
+        wk(rw)["trips"].append({**r, "_fine_here": (not fine_elsewhere)})
+        if fine_elsewhere:
+            wk(fw)["fines"].append(r)
+
+    rate = round(1 - sk_pct / 100, 4)                    # ставка к выплате = доля после СК
+    ordered = sorted(set(weeks) | set(income_by_week))
+    title_of = {m: _week_label(m)[:31] for m in ordered}
+
+    wb = openpyxl.Workbook()
+    summary = wb.active
+    summary.title = "Сводная"
+
+    # ── Вкладки по неделям ──
+    for monday in ordered:
+        b = weeks.get(monday, {"trips": [], "fines": []})
+        ws = wb.create_sheet(title=title_of[monday])
+        for ci, h in enumerate(WEEKLY_EXPORT_HEADERS, start=1):
+            c = ws.cell(row=1, column=ci, value=h)
+            c.fill = _HDR_FILL; c.font = _HDR_FONT; c.alignment = _CENTER
+
+        rownum = 2
+
+        def _put(vals):
+            nonlocal rownum
+            for ci, v in enumerate(vals, start=1):
+                c = ws.cell(row=rownum, column=ci, value=v)
+                if ci in (11, 12):
+                    c.number_format = _MONEY
+                elif ci in (7, 9, 10) and isinstance(v, datetime):
+                    c.number_format = _DTF
+            rownum += 1
+
+        for t in b["trips"]:
+            _put([
+                t.get("request_number"), t.get("external_request_number", ""), t.get("tariff_type", ""),
+                t.get("plate", ""), t.get("driver", ""), t.get("driver_phone", ""), t.get("confirmed_at"),
+                t.get("status", ""), t.get("dep_at"), t.get("end_at"), t.get("amount") or 0,
+                (t.get("fines") or 0) if t["_fine_here"] else None, "",
+            ])
+        for f in b["fines"]:
+            frw = f.get("report_week")
+            note = f"Штраф за рейс (неделя рейса {_week_label(frw)})" if frw else "Штраф за рейс"
+            # строка-штраф: статус/даты/сумма пустые, чтобы не задваивать рейс в COUNTIF/сумме
+            _put([
+                f.get("request_number"), f.get("external_request_number", ""), f.get("tariff_type", ""),
+                f.get("plate", ""), f.get("driver", ""), f.get("driver_phone", ""), None,
+                "", None, None, None, f.get("fines") or 0, note,
+            ])
+
+        last = rownum - 1 if rownum > 2 else 1
+        ws.freeze_panes = "A2"
+        for ci, h in enumerate(WEEKLY_EXPORT_HEADERS, start=1):
+            ws.column_dimensions[get_column_letter(ci)].width = max(14, len(h) + 2)
+
+        # Блок «ИТОГ НЕДЕЛИ» (O/P) — на формулах
+        oc = ws.cell(row=1, column=15, value="ИТОГ НЕДЕЛИ")
+        oc.fill = _TOT_FILL; oc.font = Font(bold=True)
+        block = [
+            ("Период (неделя)", _week_label(monday), None),
+            ("Рейсов выполнено", f'=COUNTIF($H$2:$H${last},"Завершено")', _CNT),
+            ("Рейсов отменено", f'=COUNTIF($H$2:$H${last},"Отменено")+COUNTIF($H$2:$H${last},"Срыв")', _CNT),
+            ('Прочие статусы («Получен ответ»)', f'=COUNTIF($H$2:$H${last},"Получен ответ")', _CNT),
+            ("Всего строк", f'=COUNTA($A$2:$A${last})', _CNT),
+            ("Сумма, ₽", f'=SUM($K$2:$K${last})', _MONEY),
+            ("Сумма штрафов, ₽", f'=SUM($L$2:$L${last})', _MONEY),
+            ("Итого (сумма − штрафы), ₽", "=P7-P8", _MONEY),
+            ("К выплате (итого × ставка), ₽", "=P9*Сводная!$C$3", _MONEY),
+            ("Поступления (по дате платежа), ₽", round(income_by_week.get(monday, 0) or 0, 2), _MONEY),
+        ]
+        for i, (label, val, fmt) in enumerate(block, start=2):
+            lc = ws.cell(row=i, column=15, value=label)
+            if i == 2:
+                lc.font = Font(bold=True)
+            pc = ws.cell(row=i, column=16, value=val)
+            if fmt:
+                pc.number_format = fmt
+        ws.column_dimensions["O"].width = 34
+        ws.column_dimensions["P"].width = 30
+
+    # ── «Сводная» ──
+    summary["A1"] = f"Реестр поездок по неделям — перевозчик «{carrier_name}»"
+    summary["A1"].font = Font(bold=True, size=13)
+    summary["A2"] = "Неделя отчётности = неделя поступления реестра/штрафа к учёту (не факт. дата рейса). Все числа — формулы."
+    summary["A3"] = "Ставка к выплате"
+    pcell = summary["C3"]; pcell.value = rate; pcell.number_format = _PCT; pcell.fill = _PARAM_FILL; pcell.font = Font(bold=True)
+    summary["D3"] = "← жёлтая ячейка: параметр (доля после СК). Пересчитывает «К выплате» на всех вкладках."
+
+    head = ["Период (неделя)", "Вкладка", "Рейсов выполнено", "Рейсов отменено",
+            "Прочие статусы", "Всего строк", "Сумма, ₽", "Штрафы, ₽", "Итого, ₽",
+            "К выплате (Netto), ₽", "Поступления, ₽", "Накопит. остаток, ₽"]
+    HROW = 5
+    for ci, h in enumerate(head, start=1):
+        c = summary.cell(row=HROW, column=ci, value=h)
+        c.fill = _HDR_FILL; c.font = _HDR_FONT; c.alignment = _CENTER
+
+    first = HROW + 1
+    r = first
+    for monday in ordered:
+        t = f"'{title_of[monday]}'"
+        summary.cell(row=r, column=1, value=_week_label(monday))
+        summary.cell(row=r, column=2, value=title_of[monday])
+        for col, pref in ((3, "$P$3"), (4, "$P$4"), (5, "$P$5"), (6, "$P$6"), (7, "$P$7"), (8, "$P$8")):
+            cc = summary.cell(row=r, column=col, value=f"={t}!{pref}")
+            cc.number_format = _CNT if col <= 6 else _MONEY
+        summary.cell(row=r, column=9, value=f"=G{r}-H{r}").number_format = _MONEY
+        summary.cell(row=r, column=10, value=f"=I{r}*$C$3").number_format = _MONEY
+        summary.cell(row=r, column=11, value=f"={t}!$P$11").number_format = _MONEY
+        cum_prev = "" if r == first else f"L{r-1}+"
+        summary.cell(row=r, column=12, value=f"={cum_prev}J{r}-K{r}").number_format = _MONEY
+        r += 1
+    lastr = r - 1
+
+    # ИТОГО
+    summary.cell(row=r, column=1, value="ИТОГО").font = Font(bold=True)
+    for col in range(3, 12):
+        L = get_column_letter(col)
+        cc = summary.cell(row=r, column=col, value=f"=SUM({L}{first}:{L}{lastr})")
+        cc.number_format = _CNT if col <= 6 else _MONEY
+        cc.font = Font(bold=True)
+    tc = summary.cell(row=r, column=12, value=f"=L{lastr}")   # накопит остаток = последняя неделя
+    tc.number_format = _MONEY; tc.font = Font(bold=True)
+
+    widths = [24, 20, 15, 15, 14, 12, 15, 13, 15, 16, 15, 17]
+    for ci, w in enumerate(widths, start=1):
+        summary.column_dimensions[get_column_letter(ci)].width = w
+    summary.freeze_panes = "A6"
+
+    buf = BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
 def _parse_dep_date(raw) -> date:
     if isinstance(raw, datetime):
         return raw.date()
@@ -175,8 +363,14 @@ def _iso_week_monday(d: date) -> date:
     return d - timedelta(days=d.weekday())
 
 
-def import_trips(file_bytes: bytes, session: Session, source: str = "", carrier_name: str = "") -> dict:
+def import_trips(file_bytes: bytes, session: Session, source: str = "", carrier_name: str = "", report_week: Optional[date] = None) -> dict:
     """LIVE import path (redesigned 2026-06-19, see module docstring).
+
+    `report_week` (понедельник недели отчётности, из диалога импорта): если
+    задан — на КАЖДЫЙ рейс этой партии проставляется report_week, а на рейсы с
+    ненулевым штрафом ещё и fines_report_week. Так «неделя загрузки реестра»
+    фиксируется для выгрузки по перевозчику. Если None — поля недели не трогаем
+    (сохраняются прежние значения, напр. из бэкфилла).
 
     One Trip row per source row - every status included, no week/driver
     grouping. Re-importing the same (or an updated, overlapping) file is
@@ -285,6 +479,12 @@ def import_trips(file_bytes: bytes, session: Session, source: str = "", carrier_
             source=source,
             carrier_name=carrier_name,
         )
+        # Неделя отчётности из диалога импорта: рейсу — report_week, рейсу со
+        # штрафом — ещё и fines_report_week (штраф поступил к учёту этой неделей).
+        if report_week is not None:
+            fields["report_week"] = report_week
+            if (fields["fines"] or 0) > 0:
+                fields["fines_report_week"] = report_week
 
         trip = existing.get(request_number)
         if trip:

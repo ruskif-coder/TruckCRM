@@ -1344,7 +1344,7 @@
 
 /* Модалка «Биллинг» перевозчика — недельная разбивка (Отчёты→Перевозчики). */
 .nd .bill-week {
-  display: grid; grid-template-columns: minmax(92px, 1.3fr) 40px repeat(3, minmax(56px, 1fr));
+  display: grid; grid-template-columns: minmax(78px, 1.1fr) 30px repeat(5, minmax(46px, 1fr));
   gap: 4px 8px; align-items: center; padding: 8px 2px; border-bottom: 1px solid var(--line-row);
   font: 500 12px var(--font-mono); font-variant-numeric: tabular-nums; color: var(--ink);
 }
@@ -1398,3 +1398,7 @@
 @media (prefers-reduced-motion: reduce) {
   .nd-burgerfab { transition: opacity .2s ease; transform: none; }
 }
+
+/* Расхлоп строки (expand) — не разворачиваем на весь экран: показываем ~до 20
+   строк, дальше внутренний вертикальный скролл. */
+.nd .nd-expand-scroll { max-height: 540px; overflow-y: auto; overflow-x: auto; scrollbar-gutter: stable; }

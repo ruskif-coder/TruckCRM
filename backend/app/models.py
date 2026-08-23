@@ -403,6 +403,14 @@ class TripBase(SQLModel):
     # / DEFAULT_CARRIER_NAME above and memory: transport-crm-rebuild-scope.
     source: str = ""
     carrier_name: str = ""
+    # Неделя отчётности (понедельник ISO-недели) — к какой неделе рейс/штраф
+    # отнесён при загрузке в систему. Нужна для выгрузки по перевозчику: у него
+    # учёт по неделе поступления реестра, а не по фактической дате рейса, иначе
+    # разночтения. report_week — неделя рейса; fines_report_week — неделя, когда
+    # штраф поступил к учёту (обычно = report_week, но штраф может прийти позже).
+    # Проставляются при импорте (выбор недели) и историческим бэкфиллом из файла.
+    report_week: Optional[date] = None
+    fines_report_week: Optional[date] = None
 
 
 class Trip(TripBase, table=True):
