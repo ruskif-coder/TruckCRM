@@ -73,18 +73,6 @@ def dashboard(
     today = date.today()
     now = datetime.now()
 
-    # По умолчанию - последние 30 дней (тот же диапазон, что и на страницах
-    # Рейсы/Топливо) - не "весь период", иначе первая загрузка тащит всю
-    # историю и искажает сравнение с предыдущим периодом.
-    if date_to is None:
-        date_to = today
-    if date_from is None:
-        date_from = date_to - timedelta(days=30)
-
-    period_days = (date_to - date_from).days + 1
-    prev_date_to = date_from - timedelta(days=1)
-    prev_date_from = prev_date_to - timedelta(days=period_days - 1)
-
     trips = session.exec(select(models.Trip)).all()
     fuel_records = session.exec(select(models.FuelRecord)).all()
     cashflow = session.exec(select(models.CashFlowEntry)).all()
@@ -93,6 +81,22 @@ def dashboard(
     carriers = session.exec(select(models.Carrier)).all()
     mileage_logs = session.exec(select(models.MileageLog)).all()
     documents = session.exec(select(models.Document)).all()
+
+    # По умолчанию — то же якорное окно, что у графика динамики: последние
+    # TREND_WEEKS ISO-недель, заканчивая последней неделей с рейсами (не
+    # «сегодня»). Так ВЕСЬ дашборд (график, KPI, «Денежный поток») считается за
+    # ОДИН период. Явно переданные date_from/date_to уважаем.
+    if date_from is None or date_to is None:
+        trip_weeks = {iso_week_monday(t.dep_at.date()) for t in trips if t.dep_at}
+        anchor = min(max(trip_weeks) if trip_weeks else iso_week_monday(today), iso_week_monday(today))
+        if date_to is None:
+            date_to = anchor + timedelta(days=6)
+        if date_from is None:
+            date_from = anchor - timedelta(weeks=TREND_WEEKS - 1)
+
+    period_days = (date_to - date_from).days + 1
+    prev_date_to = date_from - timedelta(days=1)
+    prev_date_from = prev_date_to - timedelta(days=period_days - 1)
 
     truck_label = {t.id: (t.label or t.plate or f"Машина #{t.id}") for t in trucks}
 
@@ -284,11 +288,50 @@ def dashboard(
         key=lambda r: r["value"],
         reverse=True,
     )
+    # Дебиторка перевозчиков (ожидаемые деньги): Σ положительных балансов —
+    # сколько перевозчики ещё должны нам (net за рейсы минус оплачено). Считаем
+    # за всё время (это накопительный долг, не «за период»). Логика как в
+    # carrier_balance: net = (брутто − штрафы) × (1 − СК%), paid = income от
+    # контрагента перевозчика.
+    counterparties = session.exec(select(models.Counterparty)).all()
+    cp_by_id = {c.id: c for c in counterparties}
+    cp_name_to_carriers: dict = defaultdict(list)
+    for c in carriers:
+        if c.counterparty_id and c.counterparty_id in cp_by_id:
+            nm = (cp_by_id[c.counterparty_id].name or "").strip()
+            if nm:
+                cp_name_to_carriers[nm].append((c.name or "").strip())
+    carrier_by_name = {(c.name or "").strip(): c for c in carriers}
+    cgross: dict = defaultdict(float)
+    cfines: dict = defaultdict(float)
+    for t in trips:
+        nm = (t.carrier_name or t.source or "").strip()
+        if not nm:
+            continue
+        if not (t.status or "").lower().startswith("отмен"):
+            cgross[nm] += t.amount or 0
+        cfines[nm] += t.fines or 0
+    cpaid: dict = defaultdict(float)
+    for e in cashflow:
+        if e.income and e.income > 0:
+            for nm in cp_name_to_carriers.get((e.counterparty or "").strip(), []):
+                cpaid[nm] += e.income
+    carrier_receivable = 0.0
+    for nm in set(cgross) | set(cpaid):
+        car = carrier_by_name.get(nm)
+        sk = (car.insurance_pct or 0.0) if car else 0.0
+        net = (cgross.get(nm, 0) - cfines.get(nm, 0)) * (1 - sk / 100)
+        bal = net - cpaid.get(nm, 0)
+        if bal > 0:
+            carrier_receivable += bal
+
     cashflow_summary = {
         "income": cf_income,
         "expense": cf_expense,
         "net": cf_income - cf_expense,
         "by_category": by_category,
+        # Ожидаемые деньги — долг перевозчиков (накопительно, не за период).
+        "carrier_receivable": round2(carrier_receivable),
     }
 
     # Алерты по ТО/документам - логика не менялась, только импорт из

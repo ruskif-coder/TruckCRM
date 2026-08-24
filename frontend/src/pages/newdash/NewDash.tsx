@@ -9,6 +9,7 @@
  * повиджетно на следующем этапе — форма данных та же (см. константы ниже).
  */
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import type { ReactNode } from "react";
 import { api } from "../../api";
 import { pct, type WeeklyData } from "../../lib/weekly";
@@ -56,7 +57,7 @@ const TRIPS: [string, string, string, string, Tone, string][] = [
 ];
 
 type AlertTone = "crit" | "warn" | "ok";
-type AlertItem = { tone: AlertTone; title: string; meta: string; when: string };
+type AlertItem = { tone: AlertTone; title: string; meta: string; when: string; route?: string };
 
 // Ответ /api/foreman-dashboard/attention (admin/foreman). Форма — см. foreman_dashboard.py.
 type AttentionData = {
@@ -93,6 +94,7 @@ function mapAttention(d: AttentionData): AlertItem[] {
       title: `${doc.doc_type} ${doc.plate} ${doc.days_left < 0 ? "просрочен" : "истекает"}`,
       meta: doc.label && doc.label !== doc.plate ? doc.label : "документ ТС",
       when: doc.days_left < 0 ? "просрочен" : doc.days_left === 0 ? "сегодня" : `${doc.days_left} ${plural(doc.days_left, "день", "дня", "дней")}`,
+      route: `/newdash/cars?plate=${encodeURIComponent(doc.plate)}`,
     });
   }
   for (const r of d.urgent_repairs) {
@@ -101,6 +103,7 @@ function mapAttention(d: AttentionData): AlertItem[] {
       title: r.text.length > 46 ? r.text.slice(0, 44) + "…" : r.text,
       meta: [r.truck_label, r.driver_name].filter(x => x && x !== "—").join(" · ") || "срочный ремонт",
       when: relTime(r.created_at),
+      route: "/newdash/repair",
     });
   }
   if (d.pending_comps_count > 0) {
@@ -109,6 +112,7 @@ function mapAttention(d: AttentionData): AlertItem[] {
       title: `${d.pending_comps_count} ${plural(d.pending_comps_count, "заявка", "заявки", "заявок")} на компенсацию`,
       meta: "на рассмотрении",
       when: "",
+      route: "/newdash/finance/claims",
     });
   }
   return items;
@@ -172,7 +176,7 @@ const EXTRAS: Record<string, { km: number; cargo: string; weight: string; sum: s
 
 // Каждый KPI-показатель — отдельный виджет (перенос/ресайз/скрытие независимо).
 // «Денежный поток» — из GET /api/dashboard/ (см. Dashboard.tsx)
-type CashflowData = { income: number; expense: number; net: number; by_category: { category: string; value: number }[] };
+type CashflowData = { income: number; expense: number; net: number; by_category: { category: string; value: number }[]; carrier_receivable?: number };
 const flowMoney = (n: number) => Math.round(n).toLocaleString("ru-RU") + " ₽";
 // «Расчёт по неделям» (виджет-таблица как в Отчётах) — GET /api/dashboard/weekly
 // Палитра под сайт: поступления — фирменный лайм (--accent), расходы —
@@ -228,7 +232,7 @@ const GAP = 14, COLS = 12, LS_KEY = "fleet.desk.layout.v2";
 const DEFAULT_LAYOUT: Layout = {
   vis: { main: 1, ...KPI_VIS(1), chart: 1, fuel: 1, cashflow: 1, weekly: 1, trips: 1, alerts: 1 },
   w:   { main: 12, ...KPI_W3, chart: 8, fuel: 4, cashflow: 4, weekly: 12, trips: 7, alerts: 5 },
-  h:   { weekly: 360 },
+  h:   {},
   order: ["main", "kpiTrips", "kpiCars", "kpiRevenue", "kpiIdle", "chart", "fuel", "cashflow", "weekly", "trips", "alerts"],
 };
 
@@ -272,6 +276,7 @@ export default function NewDash() {
   const { user } = useAuth();
 
   const isPhone = useIsPhone();
+  const navigate = useNavigate();
   const [metric, setMetric] = useState<MetricKey>("trips");
   const [boardSpan, setBoardSpan] = useState(9);    // окно табло: 9/12/18/24 ч
 
@@ -320,16 +325,14 @@ export default function NewDash() {
     return () => { alive = false; };
   }, []);
 
-  // Реальные данные из /api/dashboard/ (за 30 дней): «Денежный поток» + тренд
-  // (график динамики по неделям) + топливо. Один запрос на три виджета.
+  // Реальные данные из /api/dashboard/: «Денежный поток» + тренд (график
+  // динамики по неделям) + топливо. Без явного периода — бэкенд берёт единое
+  // якорное окно 8 недель (как у графика), чтобы весь дашборд был за один период.
   const [cashflow, setCashflow] = useState<CashflowData | null>(null);
   const [trend, setTrend] = useState<DashTrend | null>(null);
   useEffect(() => {
     let alive = true;
-    const isoD = (d: Date) => d.toISOString().slice(0, 10);
-    const to = new Date();
-    const from = new Date(); from.setDate(from.getDate() - 30);
-    api.get<{ cashflow: CashflowData; trend: DashTrend }>(`/api/dashboard/?date_from=${isoD(from)}&date_to=${isoD(to)}`)
+    api.get<{ cashflow: CashflowData; trend: DashTrend }>(`/api/dashboard/`)
       .then(d => { if (alive) { setCashflow(d.cashflow); setTrend(d.trend); } })
       .catch(() => { if (alive) { setCashflow({ income: 0, expense: 0, net: 0, by_category: [] }); setTrend(null); } });
     return () => { alive = false; };
@@ -384,7 +387,9 @@ export default function NewDash() {
   const wStyle = (key: WKey): React.CSSProperties => ({
     gridColumn: `span ${L.w[key]}`,
     order: L.order.indexOf(key),
-    ...(L.h[key] ? { height: L.h[key], overflow: "hidden" } : {}),
+    // «Расчёт по неделям» всегда по высоте контента — все строки без вертикального
+    // скролла (фикс-высоту/ресайз для него игнорируем).
+    ...(L.h[key] && key !== "weekly" ? { height: L.h[key], overflow: "hidden" } : {}),
     display: L.vis[key] ? undefined : "none",
   });
 
@@ -542,6 +547,10 @@ export default function NewDash() {
       const liters = f ? Math.round(f.volumes.reduce((s, x) => s + x, 0)) : 0;
       const weeks = f?.days.length ?? 0;
       const nf = (n: number) => n.toLocaleString("ru-RU");
+      const li = f ? f.days.length - 1 : -1;                 // индекс последней недели
+      const lastMoney = f && li >= 0 ? f.days[li] : 0;
+      const lastVol = f && li >= 0 ? Math.round(f.volumes[li]) : 0;
+      const lastLabel = f && li >= 0 ? f.labels[li] : "";
       return (
         <section key="fuel" className="widget" data-wkey="fuel" data-dragging={dragging === "fuel" || undefined} style={wStyle("fuel")}>
           {rig("fuel", false)}
@@ -551,37 +560,40 @@ export default function NewDash() {
           ) : !f || (f.total === 0 && liters === 0) ? (
             <div className="t-body-s" style={{ color: "var(--text-4)", padding: "24px 2px" }}>Нет заправок за период</div>
           ) : (
-            <div className="fuel-body">
-              <div className="donut"><div className="donut__hole">
-                <span className="t-num-m">{nf(liters)}</span>
-                <span style={{ font: "400 10px var(--font-mono)", color: "var(--text-3)" }}>литров</span>
-              </div></div>
-              <div className="fuel-legend">
-                <div className="fuel-legend__row"><i className="swatch swatch--cards" /><span className="t-body-s grow">Заправлено на сумму</span><span className="t-body-s num" style={{ fontWeight: 600 }}>{flowMoney(f.total)}</span></div>
-                <div className="fuel-legend__row"><i className="swatch swatch--cash" /><span className="t-body-s grow">Объём</span><span className="t-body-s num" style={{ fontWeight: 600 }}>{nf(liters)} л</span></div>
-                <div className="fuel-legend__row"><i className="swatch swatch--limit" /><span className="t-body-s grow">В среднем / неделю</span><span className="t-body-s num" style={{ fontWeight: 600 }}>{weeks ? nf(Math.round(liters / weeks)) : 0} л</span></div>
-                <div className="fuel-legend__foot"><span className="t-body-s muted">Пик — {f.labels[f.peak_idx]}</span><span className="t-body-s num" style={{ fontWeight: 600 }}>{f.peak_label}</span></div>
+            <>
+              <div className="fuel-cols">
+                <div className="fuel-col">
+                  <div className="fuel-col__cap">За 8 недель{weeks ? ` (${weeks})` : ""}</div>
+                  <div className="fuel-col__money">{flowMoney(f.total)}</div>
+                  <div className="fuel-col__vol">{nf(liters)} л{weeks ? <span className="muted"> · {nf(Math.round(liters / weeks))} л/нед</span> : null}</div>
+                </div>
+                <div className="fuel-col">
+                  <div className="fuel-col__cap">Последняя неделя{lastLabel ? ` · ${lastLabel}` : ""}</div>
+                  <div className="fuel-col__money">{flowMoney(lastMoney)}</div>
+                  <div className="fuel-col__vol">{nf(lastVol)} л</div>
+                </div>
               </div>
-            </div>
+              <div className="fuel-legend__foot" style={{ marginTop: 12 }}><span className="t-body-s muted">Пик — {f.labels[f.peak_idx]}</span><span className="t-body-s num" style={{ fontWeight: 600 }}>{f.peak_label}</span></div>
+            </>
           )}
         </section>
       );
     })(),
     cashflow: (() => {
-      const segs = cashflow
-        ? [
-            ...(cashflow.income > 0 ? [{ name: "Поступления", value: cashflow.income, color: INCOME_COLOR }] : []),
-            ...cashflow.by_category.filter(c => c.value > 0).map((c, i) => ({ name: c.category, value: c.value, color: FLOW_COLORS[i % FLOW_COLORS.length] })),
-          ]
-        : [];
-      const total = segs.reduce((s, x) => s + x.value, 0);
-      const empty = cashflow && cashflow.income === 0 && cashflow.expense === 0;
+      const income = cashflow?.income ?? 0;
+      const expense = cashflow?.expense ?? 0;
+      const receivable = cashflow?.carrier_receivable ?? 0;   // ожидаемые деньги (долг перевозчиков)
+      const expSegs = cashflow ? cashflow.by_category.filter(c => c.value > 0).map((c, i) => ({ name: c.category, value: c.value, color: FLOW_COLORS[i % FLOW_COLORS.length] })) : [];
+      const maxv = Math.max(income + receivable, expense, 1);   // общая шкала (поступления с ожидаемым vs списания)
+      const netFact = cashflow ? cashflow.net : 0;              // факт: получено − списано
+      const netForecast = netFact + receivable;                 // прогноз: + ожидаемые
+      const empty = cashflow && income === 0 && expense === 0 && receivable === 0;
       return (
         <section key="cashflow" className="widget" data-wkey="cashflow" data-dragging={dragging === "cashflow" || undefined} style={wStyle("cashflow")}>
           {rig("cashflow", false)}
           <div className="widget__head" style={{ marginBottom: 14 }}>
             <span className="t-h2">Денежный поток</span>
-            <span className="t-mono muted">за 30 дней</span>
+            <span className="t-mono muted">за 8 недель</span>
           </div>
           {cashflow === null ? (
             <div className="t-body-s" style={{ color: "var(--text-4)", padding: "12px 2px" }}>Загрузка…</div>
@@ -589,13 +601,30 @@ export default function NewDash() {
             <div className="t-body-s" style={{ color: "var(--text-4)", padding: "12px 2px" }}>Нет операций по денежному потоку за период</div>
           ) : (
             <>
-              <div className="flow-bar">
-                {segs.map((s, i) => (
-                  <div key={i} className="flow-bar__seg" style={{ width: `${(s.value / total) * 100}%`, background: s.color }} title={`${s.name}: ${flowMoney(s.value)}`} />
-                ))}
+              <div className="flow-dir">
+                <div className="flow-dir__head"><span className="t-body-s">Поступления{receivable > 0 ? " (факт + ожид.)" : ""}</span><span className="t-body-s num" style={{ fontWeight: 600, color: "var(--success-strong)" }}>{flowMoney(income)}{receivable > 0 ? <span className="muted"> +{flowMoney(receivable)}</span> : null}</span></div>
+                <div className="flow-bar">
+                  <div className="flow-bar__seg" style={{ width: `${(income / maxv) * 100}%`, background: INCOME_COLOR }} title={`Получено: ${flowMoney(income)}`} />
+                  {receivable > 0 && <div className="flow-bar__seg flow-bar__seg--expected" style={{ width: `${(receivable / maxv) * 100}%` }} title={`Ожидается (долг перевозчиков): ${flowMoney(receivable)}`} />}
+                </div>
+              </div>
+              <div className="flow-dir">
+                <div className="flow-dir__head"><span className="t-body-s">Списания</span><span className="t-body-s num" style={{ fontWeight: 600, color: "var(--danger)" }}>{flowMoney(expense)}</span></div>
+                <div className="flow-bar">
+                  {expSegs.map((s, i) => (
+                    <div key={i} className="flow-bar__seg" style={{ width: `${(s.value / maxv) * 100}%`, background: s.color }} title={`${s.name}: ${flowMoney(s.value)}`} />
+                  ))}
+                </div>
               </div>
               <div className="fuel-legend">
-                {segs.map((s, i) => (
+                {receivable > 0 && (
+                  <div className="fuel-legend__row">
+                    <i className="swatch swatch--expected" />
+                    <span className="t-body-s grow ellip">Ожидается (долг перевозчиков)</span>
+                    <span className="t-body-s num" style={{ fontWeight: 600 }}>{flowMoney(receivable)}</span>
+                  </div>
+                )}
+                {expSegs.map((s, i) => (
                   <div className="fuel-legend__row" key={i}>
                     <i className="swatch" style={{ background: s.color }} />
                     <span className="t-body-s grow ellip">{s.name}</span>
@@ -603,8 +632,12 @@ export default function NewDash() {
                   </div>
                 ))}
                 <div className="fuel-legend__foot">
-                  <span className="t-body-s muted">Сальдо</span>
-                  <span className={"t-body-s num" + (cashflow.net < 0 ? " neg" : "")} style={{ fontWeight: 700, color: cashflow.net >= 0 ? "var(--success-strong)" : "var(--danger)" }}>{flowMoney(cashflow.net)}</span>
+                  <span className="t-body-s muted">Сальдо · факт / прогноз</span>
+                  <span className="t-body-s num" style={{ fontWeight: 700 }}>
+                    <span style={{ color: netFact >= 0 ? "var(--success-strong)" : "var(--danger)" }}>{flowMoney(netFact)}</span>
+                    <span className="muted"> / </span>
+                    <span style={{ color: netForecast >= 0 ? "var(--success-strong)" : "var(--danger)" }}>{flowMoney(netForecast)}</span>
+                  </span>
                 </div>
               </div>
             </>
@@ -712,13 +745,18 @@ export default function NewDash() {
             <div className="t-body-s" style={{ color: "var(--text-4)", padding: "12px 10px" }}>Всё под контролем — активных предупреждений нет</div>
           ) : (
             alerts.map((a, i) => (
-              <div className="feed__item" key={i}>
+              <div className={"feed__item" + (a.route ? " feed__item--link" : "")} key={i}
+                role={a.route ? "button" : undefined} tabIndex={a.route ? 0 : undefined}
+                title={a.route ? "Открыть источник" : undefined}
+                onClick={a.route ? () => navigate(a.route!) : undefined}
+                onKeyDown={a.route ? (e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate(a.route!); } }) : undefined}>
                 <span className={`dot dot--${a.tone}`} style={{ marginTop: 5 }} />
                 <div className="grow">
                   <div className="feed__title">{a.title}</div>
                   <div className="feed__meta">{a.meta}</div>
                 </div>
                 {a.when && <span className="feed__when">{a.when}</span>}
+                {a.route && <span className="feed__chev" aria-hidden>›</span>}
               </div>
             ))
           )}

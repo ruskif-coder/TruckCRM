@@ -5,6 +5,7 @@
  * Данные: /api/trucks/ (+ fleet-stats, active-sessions).
  */
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { api, ApiError, fileUrl, logDownload } from "../../api";
 import { fmtDate } from "../../lib/format";
 import { useAuth } from "../../auth/AuthContext";
@@ -124,6 +125,15 @@ export default function NewDashVehicles() {
   const activeCount = sorted ? 1 : 0;
 
   const [viewTruck, setViewTruck] = useState<Truck | null>(null);
+  // Переход из виджета «Требует внимания» по ?plate — открыть карточку этой машины.
+  const [searchParams] = useSearchParams();
+  const focusedRef = useRef(false);
+  useEffect(() => {
+    const plate = searchParams.get("plate");
+    if (focusedRef.current || !plate || trucks.length === 0) return;
+    const t = trucks.find(x => (x.plate || "").toUpperCase() === plate.toUpperCase());
+    if (t) { focusedRef.current = true; setViewTruck(t); }
+  }, [trucks, searchParams]);
   const [editId, setEditId] = useState<number | null>(null);      // null = закрыто, 0 = новый, >0 = редактирование
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [scans, setScans] = useState<Record<string, string>>({});
