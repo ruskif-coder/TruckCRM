@@ -25,6 +25,15 @@ import "./newdash.css";
 
 type WeekRow = WeeklyTotals & { week_start: string; week_end: string; id: string };
 
+// Прошлое воскресенье (конец последней завершённой недели) в ISO-формате.
+function lastSundayIso(): string {
+  const d = new Date();
+  const day = (d.getDay() + 6) % 7;                     // пн=0
+  const curMon = new Date(d); curMon.setDate(d.getDate() - day);
+  const lastSun = new Date(curMon); lastSun.setDate(curMon.getDate() - 1);
+  return isoDate(lastSun);
+}
+
 // Номер ISO-недели по дате (для подписи «Нxx»).
 function isoWeek(iso: string): number {
   const d = new Date(iso + "T00:00:00Z");
@@ -50,12 +59,15 @@ export default function NewDashReportsSummary() {
   // По умолчанию — ВСЯ история (dateFrom пусто → бэкенд отдаёт от первого рейса).
   // После первой загрузки подставляем реальную дату старта в пикер, чтобы можно
   // было сузить период вручную.
+  // Конец периода — прошлое воскресенье (последняя ЗАВЕРШЁННАЯ неделя), как в
+  // «Отчётах по машинам». Иначе последней строкой была бы текущая неделя, по
+  // которой топливо (выписка E100) ещё не загружено — выглядело бы как «пропало».
   const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState(() => isoDate(new Date()));
+  const [dateTo, setDateTo] = useState(lastSundayIso);
   const rangeInit = useRef(false);
   const isNarrowed = !!dateFrom && rangeInit.current && dateFrom !== (data?.period.date_from ?? "");
   const activeCount = (sorted ? 1 : 0) + (isNarrowed ? 1 : 0);
-  const resetAllFilters = () => { setDateFrom(data?.period.date_from ?? ""); setDateTo(isoDate(new Date())); resetSortRef.current(); };
+  const resetAllFilters = () => { setDateFrom(data?.period.date_from ?? ""); setDateTo(lastSundayIso()); resetSortRef.current(); };
 
   useEffect(() => {
     let cancelled = false;

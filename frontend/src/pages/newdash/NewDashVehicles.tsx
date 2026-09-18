@@ -6,7 +6,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { api, ApiError, fileUrl, logDownload } from "../../api";
+import { api, ApiError, logDownload } from "../../api";
 import { fmtDate } from "../../lib/format";
 import { useAuth } from "../../auth/AuthContext";
 import NdMenu from "./NdMenu";
@@ -200,6 +200,14 @@ export default function NewDashVehicles() {
       setPwError(e instanceof ApiError ? e.message : "Ошибка удаления");
     } finally { setPwBusy(false); }
   }
+  // Скачивание скана с осмысленным именем: «Вид документа Гос.номер.ext».
+  async function downloadDoc(scan: string, label: string, plate: string) {
+    const ext = scan.includes(".") ? scan.slice(scan.lastIndexOf(".")) : "";
+    const name = `${label} ${plate || ""}`.trim().replace(/\s+/g, " ") + ext;
+    try { await api.download(`/api/files/truck-scans/${scan}`, name); } catch { /* сеть/сессия — не блокируем */ }
+    logDownload(scan, "documents");
+  }
+
   async function uploadScan(docType: "sts" | "osago" | "kasko" | "tech_inspection", file: File) {
     if (!editId) return;
     const key = `${docType}_scan`;
@@ -378,7 +386,7 @@ export default function NewDashVehicles() {
                     {doc.date && <div className="t-caption" style={{ color: isOverdue(doc.date) ? "var(--danger)" : "var(--text-2)", marginTop: 1 }}>до {fmtDate(doc.date)}</div>}
                   </div>
                   {doc.scan
-                    ? <a className="btn btn--primary" href={fileUrl(`/truck-scans/${doc.scan}`)} download target="_blank" rel="noreferrer" onClick={() => logDownload(doc.scan, "documents")} style={{ flexShrink: 0 }}>Скачать</a>
+                    ? <button type="button" className="btn btn--primary" onClick={() => downloadDoc(doc.scan, doc.label, t.plate)} style={{ flexShrink: 0 }}>Скачать</button>
                     : <span className="btn" style={{ background: "var(--surface-2)", color: "var(--text-3)", flexShrink: 0 }}>Нет файла</span>}
                 </div>
               ))}

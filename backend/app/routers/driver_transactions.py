@@ -290,12 +290,15 @@ def create_transaction(
         )
         session.add(cash_entry)
 
-    # Выплата водителю → фиксируем расход в реестре расходов (статья "Расчёт с водителем")
-    if payload.tx_type == "payout":
+    # Выплата ИЛИ аванс водителю → деньги ушли из кассы, фиксируем расход в реестре
+    # (статья "Расчёт с водителем" — та же, что исключается из «прочих расходов»
+    # чистого потока, чтобы не задвоить уже начисленную выплату из weekly_pnl).
+    if payload.tx_type in ("payout", "advance"):
         driver = session.get(models.Driver, payload.driver_id)
         driver_name = driver.name if driver else f"водитель #{payload.driver_id}"
         desc = (payload.description or "").strip()
-        purpose = f"Расчёт с водителем — {driver_name}"
+        label = "Аванс" if payload.tx_type == "advance" else "Расчёт с водителем"
+        purpose = f"{label} — {driver_name}"
         if desc:
             purpose = f"{purpose}: {desc}"
         cash_entry = models.CashFlowEntry(
