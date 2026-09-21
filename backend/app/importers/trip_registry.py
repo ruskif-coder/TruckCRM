@@ -363,6 +363,51 @@ def _iso_week_monday(d: date) -> date:
     return d - timedelta(days=d.weekday())
 
 
+# Поля, изменение которых показываем в диалоге импорта (было → стало).
+# Служебные (*_id) не трекаем — водитель/машина видны через raw-строки.
+_TRACKED_FIELDS = {
+    "status": "Статус",
+    "amount": "Сумма",
+    "fines": "Штраф",
+    "dep_at": "Отгрузка",
+    "end_at": "Окончание",
+    "driver_name_raw": "Водитель",
+    "plate_raw": "Машина",
+    "tariff_type": "Тип тарификации",
+    "driver_phone": "Телефон",
+    "carrier_name": "Перевозчик",
+    "source": "Источник",
+    "report_week": "Неделя отчётности",
+    "fines_report_week": "Неделя штрафа",
+}
+
+
+def _norm_val(v):
+    """Нормализация для сравнения было/стало: числа — до копеек, пустые — к None."""
+    if v is None or v == "":
+        return None
+    if isinstance(v, bool):
+        return v
+    if isinstance(v, (int, float)):
+        return round(float(v), 2)
+    return v
+
+
+def _fmt_val(v) -> str:
+    """Человекочитаемое значение для показа в диффе."""
+    if v is None or v == "":
+        return "—"
+    if isinstance(v, datetime):
+        return v.strftime("%d.%m.%Y %H:%M")
+    if isinstance(v, date):
+        return v.strftime("%d.%m.%Y")
+    if isinstance(v, (int, float)):
+        f = float(v)
+        s = f"{f:,.2f}" if f % 1 else f"{int(f):,}"
+        return s.replace(",", " ")
+    return str(v)
+
+
 def import_trips(file_bytes: bytes, session: Session, source: str = "", carrier_name: str = "", report_week: Optional[date] = None) -> dict:
     """LIVE import path (redesigned 2026-06-19, see module docstring).
 
@@ -411,6 +456,10 @@ def import_trips(file_bytes: bytes, session: Session, source: str = "", carrier_
     trips_created = 0
     trips_updated = 0
     skipped_bad_rows = 0
+    # Построчный дифф обновляемых рейсов для показа в диалоге импорта:
+    # какие именно записи и какие поля перезаписываются (было → стало).
+    changes: list = []
+    CHANGES_CAP = 500
 
     for row in rows:
         if row is None or all(c is None for c in row):
@@ -488,13 +537,23 @@ def import_trips(file_bytes: bytes, session: Session, source: str = "", carrier_
 
         trip = existing.get(request_number)
         if trip:
+            diffs = []
             for k, v in fields.items():
                 # Не затираем ненулевую выручку/штраф нулём из следующей выгрузки:
                 # штрафы приходят позже отдельным файлом где amount=0, и наоборот.
                 if k in ("amount", "fines") and (v or 0) == 0 and (getattr(trip, k) or 0) > 0:
                     continue
+                old = getattr(trip, k, None)
+                if k in _TRACKED_FIELDS and _norm_val(old) != _norm_val(v):
+                    diffs.append({"field": _TRACKED_FIELDS[k], "old": _fmt_val(old), "new": _fmt_val(v)})
                 setattr(trip, k, v)
             trips_updated += 1
+            if diffs and len(changes) < CHANGES_CAP:
+                changes.append({
+                    "request_number": request_number,
+                    "driver": driver_fio or (trip.driver_name_raw or ""),
+                    "fields": diffs,
+                })
         else:
             trip = models.Trip(**fields)
             existing[request_number] = trip
@@ -510,6 +569,8 @@ def import_trips(file_bytes: bytes, session: Session, source: str = "", carrier_
         "skipped_bad_rows": skipped_bad_rows,
         "new_drivers": new_driver_names,
         "new_trucks": new_truck_labels,
+        "changes": changes,
+        "changes_truncated": trips_updated > len(changes) and len(changes) >= CHANGES_CAP,
     }
 
 

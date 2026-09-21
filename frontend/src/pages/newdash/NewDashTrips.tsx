@@ -45,7 +45,9 @@ type Trip = {
 type Driver = { id: number; name: string };
 type Truck = { id: number; label: string; plate?: string };
 type Carrier = { id: number; name: string; insurance_pct: number };
-type ImportSummary = { total_rows: number; trips_created: number; trips_updated: number; skipped_bad_rows: number; new_drivers: string[]; new_trucks: string[] };
+type ImportFieldChange = { field: string; old: string; new: string };
+type ImportChange = { request_number: string; driver: string; fields: ImportFieldChange[] };
+type ImportSummary = { total_rows: number; trips_created: number; trips_updated: number; skipped_bad_rows: number; new_drivers: string[]; new_trucks: string[]; changes?: ImportChange[]; changes_truncated?: boolean };
 
 const SOURCES = ["OZON", "WB", "ATI", "Прямые", "Прочие"];
 
@@ -407,7 +409,41 @@ export default function NewDashTrips() {
               {importSummary.new_drivers.length > 0 && <div className="facts__row"><span className="facts__label">Новые водители</span><span className="facts__value">{importSummary.new_drivers.length}</span></div>}
               {importSummary.new_trucks.length > 0 && <div className="facts__row"><span className="facts__label">Новые машины</span><span className="facts__value">{importSummary.new_trucks.length}</span></div>}
             </div>
-          ) : (
+          ) : null}
+
+          {importSummary && importSummary.changes && importSummary.changes.length > 0 && (
+            <div style={{ marginTop: 14 }}>
+              <div className="t-caption muted" style={{ marginBottom: 8 }}>
+                Изменённые записи ({importSummary.changes.length}
+                {importSummary.changes_truncated ? "+" : ""}) — было → стало:
+              </div>
+              <div className="nd-import-diff">
+                {importSummary.changes.map((ch, i) => (
+                  <div key={ch.request_number + "_" + i} className="nd-diff-row">
+                    <div className="nd-diff-row__head">
+                      <span className="t-mono" style={{ fontWeight: 600 }}>№ {ch.request_number}</span>
+                      {ch.driver && <span className="muted" style={{ marginLeft: 8 }}>{ch.driver}</span>}
+                    </div>
+                    {ch.fields.map((f, j) => (
+                      <div key={j} className="nd-diff-field">
+                        <span className="nd-diff-field__label">{f.field}</span>
+                        <span className="nd-diff-field__old">{f.old}</span>
+                        <span className="nd-diff-field__arrow">→</span>
+                        <span className="nd-diff-field__new">{f.new}</span>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+              {importSummary.changes_truncated && (
+                <div className="t-caption muted" style={{ marginTop: 6 }}>
+                  Показаны первые {importSummary.changes.length} изменённых рейсов из {importSummary.trips_updated}.
+                </div>
+              )}
+            </div>
+          )}
+
+          {!importSummary && (
             <>
               <div className="field">
                 <span className="field__label">Источник заявок</span>

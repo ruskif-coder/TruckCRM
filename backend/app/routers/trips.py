@@ -52,7 +52,8 @@ async def import_trips_endpoint(
     # импортёра), а не построчный дифф на каждый рейс: при импорте реестра
     # это сотни строк за раз, и для журнала действий важнее факт и масштаб
     # операции, чем поле-в-поле изменения каждой записи.
-    audit.log_action(session, user=user, action="import", zone="trips", entity_label=f"файл «{file.filename or ''}»", extra=result)
+    audit_extra = {k: v for k, v in result.items() if k != "changes"}
+    audit.log_action(session, user=user, action="import", zone="trips", entity_label=f"файл «{file.filename or ''}»", extra=audit_extra)
     return result
 
 
