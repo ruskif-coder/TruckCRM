@@ -4,7 +4,6 @@ from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from sqlmodel import Session
@@ -209,17 +208,17 @@ app.include_router(carrier_balance_router.router, dependencies=protected)
 # /newdash и т.п. за пользователем. Auth-only, каждый пишет только своё.
 app.include_router(user_prefs_router.router, dependencies=protected)
 
-# Статические файлы фото приёмки: /photos/<filename>
-# PHOTOS_DIR задаётся env (docker-compose: /photos → ./data/photos на хосте).
+# Директории для фото приёмки и скан-документов машин.
+# SECURITY (аудит 2026-09-23): раньше здесь были app.mount(StaticFiles) —
+# они раздавали /photos/<uuid> и /truck-scans/<uuid> ПУБЛИЧНО, без токена,
+# в обход авторизованного роутера files.py (/api/files/...?token=). Монты
+# удалены; отдача файлов — только через files.py с проверкой JWT. Здесь
+# оставлено только создание директорий (нужно для загрузки и для
+# cleanup-photos ниже).
 _photos_dir = os.environ.get("PHOTOS_DIR", "./photos")
 os.makedirs(_photos_dir, exist_ok=True)
-app.mount("/photos", StaticFiles(directory=_photos_dir), name="photos")
-
-# Статические файлы скан-документов машин: /truck-scans/<filename>
-# TRUCK_SCANS_DIR задаётся env (docker-compose: /truck-scans → ./data/truck_scans).
 _truck_scans_dir = os.environ.get("TRUCK_SCANS_DIR", "./truck_scans")
 os.makedirs(_truck_scans_dir, exist_ok=True)
-app.mount("/truck-scans", StaticFiles(directory=_truck_scans_dir), name="truck-scans")
 
 
 @app.get("/api/health")

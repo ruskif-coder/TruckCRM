@@ -246,6 +246,12 @@ def create_transaction(
     if payload.amount <= 0:
         raise HTTPException(status_code=400, detail="amount должен быть > 0")
 
+    # Проверяем, что водитель существует: иначе создались бы «висячие»
+    # финансовые проводки и CashFlowEntry на несуществующий driver_id
+    # (опечатка в форме) — их потом не видно ни в одном балансе (аудит 2026-09-23).
+    if not session.get(models.Driver, payload.driver_id):
+        raise HTTPException(status_code=404, detail="Водитель не найден")
+
     if payload.tx_type == "fine_company" and not (payload.description or "").strip():
         raise HTTPException(
             status_code=400,

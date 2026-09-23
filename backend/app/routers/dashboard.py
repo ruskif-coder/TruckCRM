@@ -314,7 +314,9 @@ def dashboard(
     cpaid: dict = defaultdict(float)
     for e in cashflow:
         if e.income and e.income > 0:
-            for nm in cp_name_to_carriers.get((e.counterparty or "").strip(), []):
+            # Платёж — только одному перевозчику (см. carrier_balance.py): в норме
+            # контрагент↔перевозчик 1:1; при общем контрагенте не задваиваем (аудит 2026-09-23).
+            for nm in cp_name_to_carriers.get((e.counterparty or "").strip(), [])[:1]:
                 cpaid[nm] += e.income
     carrier_receivable = 0.0
     for nm in set(cgross) | set(cpaid):

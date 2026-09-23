@@ -7,6 +7,10 @@ services:
     # в docker-compose.dev.yml (аудит безопасности 2026-07-13).
     environment:
       - DATABASE_URL=sqlite:////data/transport_crm.db
+      # APP_ENV: production → fail-closed auth (без JWT_SECRET/ADMIN_PASSWORD
+      # приложение не стартует). Для локальной разработки вне docker можно
+      # переопределить APP_ENV=dev. По умолчанию — production (аудит 2026-09-23).
+      - APP_ENV=${APP_ENV:-production}
       # ──────────────────────────────────────────────────────────
       # ADMIN_PASSWORD: пароль администратора.
       # Задай перед первым запуском — или измени и перезапусти

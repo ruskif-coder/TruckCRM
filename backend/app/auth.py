@@ -22,8 +22,20 @@ from sqlmodel import Session, select
 from . import models
 from .database import get_session
 
+# APP_ENV=production (в docker-compose проставлено по умолчанию) переводит
+# auth в fail-closed режим: без JWT_SECRET/ADMIN_PASSWORD приложение не
+# стартует, вместо тихого отката на небезопасные dev-значения (аудит 2026-09-23).
+_IS_PROD = os.environ.get("APP_ENV", "").lower() in ("production", "prod")
+
 _JWT_DEV_FALLBACK = "transport-crm-dev-secret-INSECURE-DO-NOT-USE-IN-PRODUCTION"
 _jwt_env = os.environ.get("JWT_SECRET", "")
+
+if not _jwt_env and _IS_PROD:
+    raise RuntimeError(
+        "JWT_SECRET не задан, а APP_ENV=production. Откат на dev-ключ в проде "
+        "запрещён (любой, кто видел исходники, подделал бы admin-токен). "
+        "Задайте JWT_SECRET в .env (python -c \"import secrets; print(secrets.token_hex(32))\")."
+    )
 
 if not _jwt_env:
     import warnings
@@ -169,6 +181,12 @@ def seed_default_admin(session: Session) -> None:
 
     if not existing:
         # Первый старт — создаём admin
+        if not env_password and _IS_PROD:
+            raise RuntimeError(
+                "ADMIN_PASSWORD не задан, а APP_ENV=production. Создание admin с "
+                "дефолтным паролем 'admin123' в проде запрещено. Задайте "
+                "ADMIN_PASSWORD в .env."
+            )
         pw = env_password or "admin123"  # dev fallback
         admin = models.User(
             username=env_username,

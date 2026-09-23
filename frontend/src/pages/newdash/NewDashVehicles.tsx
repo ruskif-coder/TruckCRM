@@ -6,7 +6,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { api, ApiError, getToken, logDownload } from "../../api";
+import { api, ApiError, logDownload } from "../../api";
 import { fmtDate } from "../../lib/format";
 import { useAuth } from "../../auth/AuthContext";
 import NdMenu from "./NdMenu";
@@ -201,14 +201,13 @@ export default function NewDashVehicles() {
     } finally { setPwBusy(false); }
   }
   // Скачивание скана с осмысленным именем: «Вид документа Гос.номер.ext».
-  // Эндпоинт /api/files/ авторизует по query-параметру ?token= (не по заголовку),
-  // поэтому токен кладём в URL; api.download сохраняет ответ blob'ом под именем name.
+  // api.download шлёт JWT в заголовке Authorization (files.py его принимает),
+  // поэтому токен в URL НЕ кладём — иначе он утекал бы в логи прокси/историю
+  // (аудит 2026-09-23). Query-токен остаётся только для инлайновых <img>.
   async function downloadDoc(scan: string, label: string, plate: string) {
     const ext = scan.includes(".") ? scan.slice(scan.lastIndexOf(".")) : "";
     const name = `${label} ${plate || ""}`.trim().replace(/\s+/g, " ") + ext;
-    const token = getToken();
-    const path = `/api/files/truck-scans/${scan}` + (token ? `?token=${encodeURIComponent(token)}` : "");
-    try { await api.download(path, name); logDownload(scan, "documents"); }
+    try { await api.download(`/api/files/truck-scans/${scan}`, name); logDownload(scan, "documents"); }
     catch (e) { setError(e instanceof ApiError ? e.message : "Не удалось скачать файл"); }
   }
 

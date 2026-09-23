@@ -103,7 +103,12 @@ def carrier_balance_summary(
         cp_text = (entry.counterparty or "").strip()
         names = cp_name_to_carriers.get(cp_text, [])
         wk = _iso_week_monday(_as_date(entry.date)) if entry.date else None
-        for carrier_name in names:
+        # Платёж относим ТОЛЬКО к одному перевозчику. В норме контрагент↔перевозчик
+        # 1:1 (у каждого своё юрлицо), тогда names[:1] == names. Если контрагент
+        # привязан к нескольким перевозчикам — раньше платёж прибавлялся в ПОЛНОЙ
+        # сумме каждому (двойной учёт, завышал paid и carrier_receivable); теперь
+        # его нельзя однозначно разнести, поэтому вешаем на первого (аудит 2026-09-23).
+        for carrier_name in names[:1]:
             carrier_paid[carrier_name] += entry.income
             if wk is not None:
                 carrier_week_income[(carrier_name, wk)] += entry.income

@@ -309,6 +309,11 @@ def weekly_pnl(
 
     groups: dict = defaultdict(lambda: {"trips": 0, "gross": 0.0, "fines": 0.0, "days": set()})
     trip_count_by_truck_week: dict = defaultdict(int)
+    # Счётчик по (неделя, машина, водитель) без разбивки на перевозчика —
+    # нужен, чтобы делить платную дорогу и «Расчёт с водителем» пропорционально
+    # рейсам, если один водитель+машина за неделю работал на 2+ перевозчиков
+    # (иначе каждая строка получала бы ПОЛНУЮ сумму — двойной учёт, аудит 2026-09-23).
+    trip_count_by_truck_driver_week: dict = defaultdict(int)
     for t in in_range:
         wk = iso_week_monday(t.dep_at.date())
         key = (wk, t.truck_id, t.driver_id, t.carrier_name or t.source or "—")
@@ -318,6 +323,7 @@ def weekly_pnl(
         g["fines"] += t.fines or 0
         g["days"].add(t.dep_at.date())
         trip_count_by_truck_week[(wk, t.truck_id)] += 1
+        trip_count_by_truck_driver_week[(wk, t.truck_id, t.driver_id)] += 1
 
     rows = []
     for (wk, truck_id, driver_id, carrier_name), g in groups.items():
@@ -355,8 +361,15 @@ def weekly_pnl(
         truck_week_trips = trip_count_by_truck_week[(wk, truck_id)] or 1
         truck_week_fuel = fuel_by_truck_week.get((wk, truck_id), 0.0)
         fuel = truck_week_fuel * (g["trips"] / truck_week_trips)
-        toll = toll_by_truck_driver_week.get((wk, truck_id, driver_id), 0.0)
-        driver_paid = paid_by_truck_driver_week.get((wk, truck_id, driver_id), 0.0)
+        # Платная дорога и «Расчёт с водителем» привязаны к (неделя, машина,
+        # водитель) без перевозчика. Делим их пропорционально рейсам этой
+        # строки внутри (неделя, машина, водитель): при одном перевозчике
+        # share=1 (поведение не меняется), при нескольких — сумма строк равна
+        # фактической, без двойного учёта (аудит 2026-09-23).
+        tdw_trips = trip_count_by_truck_driver_week[(wk, truck_id, driver_id)] or 1
+        tdw_share = g["trips"] / tdw_trips
+        toll = toll_by_truck_driver_week.get((wk, truck_id, driver_id), 0.0) * tdw_share
+        driver_paid = paid_by_truck_driver_week.get((wk, truck_id, driver_id), 0.0) * tdw_share
         profit = net - fines - toll - fuel - driver_payout
         profitability = (profit / net) if net else None
         price_per_trip = (gross / g["trips"]) if g["trips"] else 0.0
