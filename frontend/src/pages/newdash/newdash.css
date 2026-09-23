@@ -1401,7 +1401,9 @@
 
 /* Расхлоп строки (expand) — не разворачиваем на весь экран: показываем ~до 20
    строк, дальше внутренний вертикальный скролл. */
-.nd .nd-expand-scroll { max-height: 540px; overflow-y: auto; overflow-x: auto; scrollbar-gutter: stable; }
+.nd .nd-expand-scroll { max-height: min(640px, calc(100vh - 380px)); min-height: 160px; overflow-y: auto; overflow-x: auto; scrollbar-gutter: stable; overscroll-behavior: contain; }
+/* Внутри расхлопа шапка недель липнет при скролле. */
+.nd .nd-expand-scroll thead th { position: sticky; top: 0; background: var(--surface-4); z-index: 1; }
 
 /* Виджет топлива — 2 колонки: за 8 недель / последняя неделя (круг убран). */
 .nd .fuel-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }

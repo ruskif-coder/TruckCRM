@@ -9,9 +9,18 @@
  *   <NdDataTable columns={COLUMNS} rows={rows} select totals
  *     sortKey="period" onRowClick={openCard} />
  */
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import NdEntityCard from "./NdEntityCard";
+
+// Расхлоп строки: окно ~20 строк, при открытии прокручено к КОНЦУ (последние
+// недели), более старые — прокруткой вверх.
+function ExpandScroll({ className, style, children }: { className: string; style?: React.CSSProperties; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => { const el = ref.current; if (el) el.scrollTop = el.scrollHeight; }, []);
+  return <div ref={ref} className={className} style={style}>{children}</div>;
+}
+
 
 // ── Типы ───────────────────────────────────────────────────────────────────
 export type ColType = "text" | "id" | "date" | "num" | "money" | "pct" | "status";
@@ -296,7 +305,7 @@ export default function NdDataTable<R extends Row = Row>(props: NdDataTableProps
                         onClick={() => { if (expand) toggleExpand(id); else onRowClick?.(r, api); }}
                         selectable={select} selected={sel.has(id)} onToggle={() => toggle(id)}
                       />
-                      {opened && expand && <div className="nd-ecard nd-expand-scroll" style={{ paddingTop: 4 }}>{expand(r)}</div>}
+                      {opened && expand && <ExpandScroll className="nd-ecard nd-expand-scroll" style={{ paddingTop: 4 }}>{expand(r)}</ExpandScroll>}
                     </Fragment>
                   );
                 })}
@@ -383,7 +392,7 @@ export default function NdDataTable<R extends Row = Row>(props: NdDataTableProps
                         })}
                       </div>
                       {opened && expand && (
-                        <div className="table__expand"><div className="nd-expand-scroll" style={{ padding: "16px 0" }}>{expand(r)}</div></div>
+                        <div className="table__expand"><ExpandScroll className="nd-expand-scroll" style={{ padding: "16px 0" }}>{expand(r)}</ExpandScroll></div>
                       )}
                     </Fragment>
                   );
