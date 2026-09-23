@@ -128,15 +128,15 @@ export default function NewDashExpenses() {
 
   const columns: Column<Row>[] = [
     { key: "date", label: "Дата", type: "date", width: "108px", sticky: true, strong: true, format: v => fmtDate(v as string) },
-    { key: "status", label: "Статус", type: "status", width: "150px", tone: r => statusTone(r.status) },
-    { key: "income", label: "Доход", type: "money", width: "128px", total: "sum", cellTone: r => (r.income > 0 ? "pos" : "mute") },
-    { key: "expense", label: "Расход", type: "money", width: "128px", total: "sum", cellTone: r => (r.expense > 0 ? "neg" : "mute") },
-    { key: "category", label: "Статья", type: "text", width: "150px" },
-    { key: "bank", label: "Банк", type: "id", width: "116px" },
-    { key: "counterparty", label: "Контрагент", type: "text", width: "150px" },
-    { key: "purpose", label: "Назначение", type: "text", width: "minmax(160px, 1fr)" },
-    { key: "truck", label: "Машина", type: "id", width: "110px" },
-    { key: "driver", label: "Водитель", type: "text", width: "140px" },
+    { key: "status", label: "Статус", type: "status", width: "136px", tone: r => statusTone(r.status) },
+    { key: "income", label: "Доход", type: "money", width: "118px", total: "sum", cellTone: r => (r.income > 0 ? "pos" : "mute") },
+    { key: "expense", label: "Расход", type: "money", width: "118px", total: "sum", cellTone: r => (r.expense > 0 ? "neg" : "mute") },
+    { key: "category", label: "Статья", type: "text", width: "minmax(150px, 1fr)" },
+    { key: "bank", label: "Банк", type: "id", width: "minmax(100px, 0.6fr)" },
+    { key: "counterparty", label: "Контрагент", type: "text", width: "minmax(170px, 1.4fr)" },
+    { key: "purpose", label: "Назначение", type: "text", width: "minmax(200px, 2fr)" },
+    { key: "truck", label: "Машина", type: "id", width: "104px" },
+    { key: "driver", label: "Водитель", type: "text", width: "minmax(140px, 0.9fr)" },
   ];
 
   return (
