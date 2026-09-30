@@ -1,9 +1,10 @@
 """Баланс перевозчиков (2026-07-12, v1.1.3).
 
-Детализация по неделям:
+Детализация по НЕДЕЛЯМ УЧЁТА (report_week / fines_report_week, фолбэк — неделя отгрузки):
   gross       = Σ trip.amount   (не отменённые рейсы перевозчика за неделю)
   fines       = Σ trip.fines    (штрафы из того же отчёта, колонка «Штраф»)
-  net         = (gross - fines) × (1 - carrier.insurance_pct / 100)
+  adj         = Σ CarrierAdjustment.amount (произвольные удержания, по неделе учёта)
+  net         = (gross - fines - adj) × (1 - carrier.insurance_pct / 100)
 
 Накопительный баланс:
   paid        = Σ CashFlowEntry.income  где counterparty совпадает с именем
@@ -24,7 +25,11 @@ from .. import models
 from ..auth import get_current_user
 from ..database import get_session
 from ..importers.trip_registry import EXPORT_HEADERS, build_carrier_weekly_export
-from ..models import Carrier, CashFlowEntry, Counterparty, Driver, Trip, Truck
+from .. import audit
+from ..models import (
+    Carrier, CarrierAdjustment, CarrierAdjustmentIn, CarrierExpensePreset,
+    CashFlowEntry, Counterparty, Driver, Trip, Truck,
+)
 
 router = APIRouter(prefix="/api/carriers/balance", tags=["carrier-balance"])
 _auth = [Depends(get_current_user)]
@@ -74,24 +79,36 @@ def carrier_balance_summary(
             if cp_name:
                 cp_name_to_carriers[cp_name].append((c.name or "").strip())
 
-    # Рейсы: группируем по (carrier_name, ISO-неделя dep_at)
+    # Рейсы: группируем по (carrier_name, НЕДЕЛЯ УЧЁТА) — как в недельной
+    # выгрузке перевозчика (решение 2026-09-30): рейс — в report_week, штраф —
+    # в fines_report_week (штраф мог поступить к учёту другой неделей). Если
+    # неделя учёта не проставлена (старые рейсы без бэкфилла) — фолбэк на
+    # неделю отгрузки/окончания.
     # gross и trips  — только не отменённые (выручки нет)
     # fines          — ВСЕ рейсы, включая отменённые: штраф за отмену
     #                  реален и должен уменьшать то, что мы платим перевозчику
-    week_buckets: dict = defaultdict(lambda: {"gross": 0.0, "fines": 0.0, "trips": 0})
+    week_buckets: dict = defaultdict(lambda: {"gross": 0.0, "fines": 0.0, "trips": 0, "adj": 0.0})
     for t in trips:
-        if not t.dep_at:
-            continue
         name = (t.carrier_name or t.source or "").strip()
         if not name:
             continue
-        wk = _iso_week_monday(t.dep_at.date())
-        key = (name, wk)
+        base = t.dep_at or t.end_at
+        rw = t.report_week or (_iso_week_monday(base.date()) if base else None)
+        if rw is None:
+            continue
+        fw = t.fines_report_week or rw
         cancelled = (t.status or "").lower().startswith("отмен")
         if not cancelled:
-            week_buckets[key]["gross"] += t.amount or 0
-            week_buckets[key]["trips"] += 1
-        week_buckets[key]["fines"] += t.fines or 0  # штрафы — всегда
+            week_buckets[(name, rw)]["gross"] += t.amount or 0
+            week_buckets[(name, rw)]["trips"] += 1
+        if t.fines:
+            week_buckets[(name, fw)]["fines"] += t.fines  # штрафы — всегда, в неделю учёта штрафа
+
+    # Произвольные расходы (удержания) — в неделю учёта, как ввёл пользователь.
+    for a in session.exec(select(CarrierAdjustment)).all():
+        nm = (a.carrier_name or "").strip()
+        if nm and a.report_week:
+            week_buckets[(nm, a.report_week)]["adj"] += a.amount or 0
 
     # Поступления по неделям: CashFlowEntry.income от контрагента перевозчика,
     # ПРИВЯЗКА К ДАТЕ ПЛАТЕЖА (entry.date), а не к неделе рейса.
@@ -117,6 +134,7 @@ def carrier_balance_summary(
     carrier_net: dict[str, float] = defaultdict(float)
     carrier_gross: dict[str, float] = defaultdict(float)
     carrier_fines: dict[str, float] = defaultdict(float)
+    carrier_adj: dict[str, float] = defaultdict(float)
     carrier_trips: dict[str, int] = defaultdict(int)
     carrier_week_map: dict[str, dict] = defaultdict(dict)          # name -> {wk: week_dict}
 
@@ -125,7 +143,7 @@ def carrier_balance_summary(
         if slot is None:
             slot = {
                 "week_start": wk.isoformat(), "week_end": (wk + timedelta(days=6)).isoformat(),
-                "trips": 0, "gross": 0.0, "fines": 0.0, "net": 0.0, "income": 0.0,
+                "trips": 0, "gross": 0.0, "fines": 0.0, "adjustments": 0.0, "net": 0.0, "income": 0.0,
             }
             carrier_week_map[name][wk] = slot
         return slot
@@ -133,14 +151,17 @@ def carrier_balance_summary(
     for (name, wk), g in week_buckets.items():
         carrier = carrier_by_name.get(name)
         sk_pct = (carrier.insurance_pct or 0.0) if carrier else 0.0
-        gross = g["gross"]; fines = g["fines"]
-        net = (gross - fines) * (1 - sk_pct / 100)
+        gross = g["gross"]; fines = g["fines"]; adj = g["adj"]
+        # Удержание вычитается ДО %СК, как штрафы (решение 2026-09-30).
+        net = (gross - fines - adj) * (1 - sk_pct / 100)
         carrier_net[name] += net
         carrier_gross[name] += gross
         carrier_fines[name] += fines
+        carrier_adj[name] += adj
         carrier_trips[name] += g["trips"]
         slot = _week_slot(name, wk)
-        slot.update(trips=g["trips"], gross=_round2(gross), fines=_round2(fines), net=_round2(net))
+        slot.update(trips=g["trips"], gross=_round2(gross), fines=_round2(fines),
+                    adjustments=_round2(adj), net=_round2(net))
 
     for (name, wk), inc in carrier_week_income.items():
         _week_slot(name, wk)["income"] = _round2(inc)
@@ -167,6 +188,7 @@ def carrier_balance_summary(
             "trips": carrier_trips.get(name, 0),
             "gross": _round2(gross),
             "fines": _round2(fines),
+            "adjustments": _round2(carrier_adj.get(name, 0.0)),
             "net": _round2(net),
             "paid": _round2(paid),
             "balance": _round2(balance),
@@ -304,10 +326,135 @@ def carrier_weekly_export(
                 income_by_week[wk] = income_by_week.get(wk, 0) + e.income
 
     sk_pct = (carrier_obj.insurance_pct or 0.0) if carrier_obj else 0.0
-    data = build_carrier_weekly_export(name, rows, income_by_week, sk_pct)
+    adjustments = [{"report_week": x.report_week, "amount": x.amount or 0, "description": x.description or ""}
+                   for x in session.exec(select(CarrierAdjustment).where(CarrierAdjustment.carrier_name == name)).all()]
+    data = build_carrier_weekly_export(name, rows, income_by_week, sk_pct, adjustments)
     safe = "".join(ch for ch in name if ch.isascii() and (ch.isalnum() or ch in " _-")).strip()[:40] or "perevozchik"
     return Response(
         content=data,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f'attachment; filename="carrier_weekly_{safe}.xlsx"'},
     )
+
+
+# ── Произвольные расходы (удержания) перевозчика + сохранённые описания ──
+_WRITE_ROLES = {"admin", "accountant"}
+
+
+def _require_writer(user: models.User = Depends(get_current_user)) -> models.User:
+    if user.role not in _WRITE_ROLES:
+        raise HTTPException(status_code=403, detail="Вносить расходы перевозчика может только admin/бухгалтер")
+    return user
+
+
+def _adj_dict(a: CarrierAdjustment) -> dict:
+    return {"id": a.id, "carrier_name": a.carrier_name, "report_week": a.report_week.isoformat(),
+            "amount": _round2(a.amount or 0), "description": a.description or ""}
+
+
+def _validate_adj(payload: CarrierAdjustmentIn, session: Session) -> tuple:
+    name = (payload.carrier_name or "").strip()
+    if not name:
+        raise HTTPException(400, "Не указан перевозчик")
+    if payload.amount is None or payload.amount <= 0:
+        raise HTTPException(400, "Сумма должна быть больше 0")
+    desc = (payload.description or "").strip()
+    if not desc:
+        raise HTTPException(400, "Укажите описание расхода")
+    known = {(c.name or "").strip() for c in session.exec(select(Carrier)).all()}
+    known |= {(t.carrier_name or t.source or "").strip() for t in session.exec(select(Trip)).all()}
+    if name not in known:
+        raise HTTPException(404, "Перевозчик не найден")
+    return name, _iso_week_monday(payload.report_week), desc
+
+
+def _save_preset(session: Session, text: str) -> None:
+    if not session.exec(select(CarrierExpensePreset).where(CarrierExpensePreset.text == text)).first():
+        session.add(CarrierExpensePreset(text=text))
+
+
+@router.get("/adjustments")
+def list_adjustments(
+    carrier: str = Query(..., description="Имя перевозчика"),
+    session: Session = Depends(get_session),
+    _user: models.User = Depends(_require_staff),
+):
+    name = carrier.strip()
+    rows = session.exec(select(CarrierAdjustment).where(CarrierAdjustment.carrier_name == name)).all()
+    return [_adj_dict(a) for a in sorted(rows, key=lambda a: (a.report_week, a.id or 0))]
+
+
+@router.post("/adjustments")
+def create_adjustment(
+    payload: CarrierAdjustmentIn,
+    session: Session = Depends(get_session),
+    user: models.User = Depends(_require_writer),
+):
+    name, week, desc = _validate_adj(payload, session)
+    a = CarrierAdjustment(carrier_name=name, report_week=week, amount=payload.amount,
+                          description=desc, created_by_user_id=user.id)
+    session.add(a)
+    if payload.save_preset:
+        _save_preset(session, desc)
+    session.commit()
+    session.refresh(a)
+    audit.log_action(session, user=user, action="create", zone="carriers", entity_id=a.id,
+                     entity_label=f"Расход перевозчика «{name}»", after=_adj_dict(a))
+    return _adj_dict(a)
+
+
+@router.put("/adjustments/{adj_id}")
+def update_adjustment(
+    adj_id: int,
+    payload: CarrierAdjustmentIn,
+    session: Session = Depends(get_session),
+    user: models.User = Depends(_require_writer),
+):
+    a = session.get(CarrierAdjustment, adj_id)
+    if not a:
+        raise HTTPException(404, "Расход не найден")
+    before = _adj_dict(a)
+    name, week, desc = _validate_adj(payload, session)
+    a.carrier_name, a.report_week, a.amount, a.description = name, week, payload.amount, desc
+    session.add(a)
+    if payload.save_preset:
+        _save_preset(session, desc)
+    session.commit()
+    session.refresh(a)
+    audit.log_action(session, user=user, action="update", zone="carriers", entity_id=a.id,
+                     entity_label=f"Расход перевозчика «{name}»", before=before, after=_adj_dict(a))
+    return _adj_dict(a)
+
+
+@router.delete("/adjustments/{adj_id}")
+def delete_adjustment(
+    adj_id: int,
+    session: Session = Depends(get_session),
+    user: models.User = Depends(_require_writer),
+):
+    a = session.get(CarrierAdjustment, adj_id)
+    if not a:
+        raise HTTPException(404, "Расход не найден")
+    before = _adj_dict(a)
+    session.delete(a)
+    session.commit()
+    audit.log_action(session, user=user, action="delete", zone="carriers", entity_id=adj_id,
+                     entity_label=f"Расход перевозчика «{before['carrier_name']}»", before=before)
+    return {"ok": True}
+
+
+@router.get("/expense-presets")
+def list_presets(session: Session = Depends(get_session), _user: models.User = Depends(_require_staff)):
+    return [{"id": p.id, "text": p.text}
+            for p in sorted(session.exec(select(CarrierExpensePreset)).all(), key=lambda p: p.text.lower())]
+
+
+@router.delete("/expense-presets/{preset_id}")
+def delete_preset(preset_id: int, session: Session = Depends(get_session),
+                  _user: models.User = Depends(_require_writer)):
+    p = session.get(CarrierExpensePreset, preset_id)
+    if not p:
+        raise HTTPException(404, "Шаблон не найден")
+    session.delete(p)
+    session.commit()
+    return {"ok": True}

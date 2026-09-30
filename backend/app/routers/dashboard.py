@@ -311,6 +311,10 @@ def dashboard(
         if not (t.status or "").lower().startswith("отмен"):
             cgross[nm] += t.amount or 0
         cfines[nm] += t.fines or 0
+    # Произвольные удержания перевозчика (CarrierAdjustment) — вычитаются до СК.
+    cadj: dict = defaultdict(float)
+    for a in session.exec(select(models.CarrierAdjustment)).all():
+        cadj[(a.carrier_name or "").strip()] += a.amount or 0
     cpaid: dict = defaultdict(float)
     for e in cashflow:
         if e.income and e.income > 0:
@@ -319,10 +323,10 @@ def dashboard(
             for nm in cp_name_to_carriers.get((e.counterparty or "").strip(), [])[:1]:
                 cpaid[nm] += e.income
     carrier_receivable = 0.0
-    for nm in set(cgross) | set(cpaid):
+    for nm in set(cgross) | set(cpaid) | set(cadj):
         car = carrier_by_name.get(nm)
         sk = (car.insurance_pct or 0.0) if car else 0.0
-        net = (cgross.get(nm, 0) - cfines.get(nm, 0)) * (1 - sk / 100)
+        net = (cgross.get(nm, 0) - cfines.get(nm, 0) - cadj.get(nm, 0)) * (1 - sk / 100)
         bal = net - cpaid.get(nm, 0)
         if bal > 0:
             carrier_receivable += bal

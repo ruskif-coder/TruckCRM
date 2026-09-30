@@ -1133,3 +1133,33 @@ class CounterpartyUpdate(SQLModel):
     name: Optional[str] = None
     inn: Optional[str] = None
     vat_rate: Optional[float] = None
+
+
+# ── Произвольные расходы (удержания) перевозчика (2026-09-30) ──
+# Начисление в расчёте с перевозчиком, привязанное к НЕДЕЛЕ УЧЁТА (понедельник),
+# а не движение денег: в кассу (CashFlowEntry), сводку по неделям и P&L не
+# попадает — только в баланс перевозчика и его недельную выгрузку.
+# Удержание: Netto = (Сумма − Штрафы − Расходы) × (1 − %СК).
+# Перевозчик — по имени (carrier_name), как у рейсов (Trip.carrier_name).
+class CarrierAdjustment(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    carrier_name: str = Field(index=True)
+    report_week: date = Field(index=True)
+    amount: float = 0
+    description: str = ""
+    created_by_user_id: Optional[int] = Field(default=None, foreign_key="user.id")
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class CarrierAdjustmentIn(SQLModel):
+    carrier_name: str
+    report_week: date
+    amount: float
+    description: str = ""
+    save_preset: bool = False
+
+
+# Сохранённые описания расходов — чтобы выбирать из готовых в форме.
+class CarrierExpensePreset(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    text: str = Field(index=True, unique=True)

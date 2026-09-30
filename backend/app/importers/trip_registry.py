@@ -175,7 +175,7 @@ WEEKLY_EXPORT_HEADERS = [
     "№ заявки", "Внешний № заявки", "Тип тарификации", "гос. Номер ТС",
     "ФИО водителя", "Телефон водителя", "Дата\\время подтверждения заявки (МСК)",
     "Статус заявки", "Дата отгрузки (Часовой пояс точки)", "Дата окончания рейса",
-    "Сумма транзакций", "Штраф", "Примечание",
+    "Сумма транзакций", "Штраф", "Примечание", "Расход (удержание)",
 ]
 
 
@@ -197,7 +197,8 @@ _PCT = "0%"
 _DTF = "dd\\.mm\\.yyyy\\ hh:mm"
 
 
-def build_carrier_weekly_export(carrier_name: str, rows: list, income_by_week: Optional[dict] = None, sk_pct: float = 0.0) -> bytes:
+def build_carrier_weekly_export(carrier_name: str, rows: list, income_by_week: Optional[dict] = None, sk_pct: float = 0.0,
+                                adjustments: Optional[list] = None) -> bytes:
     """Книга как в шаблоне пользователя, НА ФОРМУЛАХ (не статика):
     - вкладка на каждую неделю отчётности: рейсы (A–M) + блок «ИТОГ НЕДЕЛИ» в
       столбцах O/P с формулами COUNTIF/SUM по данным этой вкладки;
@@ -205,12 +206,14 @@ def build_carrier_weekly_export(carrier_name: str, rows: list, income_by_week: O
       Итого/К выплате через жёлтый параметр «Ставка к выплате» (C3 = 1 − СК%),
       Поступления (по дате платежа) и Накопит. остаток формулами.
     Правка данных в неделе пересчитывает всю сводную.
-    rows — dict'ы (см. ключи ниже). income_by_week — {понедельник: сумма}."""
+    rows — dict'ы (см. ключи ниже). income_by_week — {понедельник: сумма}.
+    adjustments — произвольные удержания [{report_week, amount, description}]:
+    отдельные строки на вкладке недели учёта, сумма в колонке N; вычитаются до СК."""
     income_by_week = income_by_week or {}
     weeks: dict = {}
 
     def wk(monday):
-        return weeks.setdefault(monday, {"trips": [], "fines": []})
+        return weeks.setdefault(monday, {"trips": [], "fines": [], "adj": []})
 
     for r in rows:
         rw = r.get("report_week")
@@ -223,6 +226,10 @@ def build_carrier_weekly_export(carrier_name: str, rows: list, income_by_week: O
         if fine_elsewhere:
             wk(fw)["fines"].append(r)
 
+    for a in adjustments or []:
+        if a.get("report_week") is not None:
+            wk(a["report_week"])["adj"].append(a)
+
     rate = round(1 - sk_pct / 100, 4)                    # ставка к выплате = доля после СК
     ordered = sorted(set(weeks) | set(income_by_week))
     title_of = {m: _week_label(m)[:31] for m in ordered}
@@ -233,7 +240,7 @@ def build_carrier_weekly_export(carrier_name: str, rows: list, income_by_week: O
 
     # ── Вкладки по неделям ──
     for monday in ordered:
-        b = weeks.get(monday, {"trips": [], "fines": []})
+        b = weeks.get(monday, {"trips": [], "fines": [], "adj": []})
         ws = wb.create_sheet(title=title_of[monday])
         for ci, h in enumerate(WEEKLY_EXPORT_HEADERS, start=1):
             c = ws.cell(row=1, column=ci, value=h)
@@ -245,7 +252,7 @@ def build_carrier_weekly_export(carrier_name: str, rows: list, income_by_week: O
             nonlocal rownum
             for ci, v in enumerate(vals, start=1):
                 c = ws.cell(row=rownum, column=ci, value=v)
-                if ci in (11, 12):
+                if ci in (11, 12, 14):
                     c.number_format = _MONEY
                 elif ci in (7, 9, 10) and isinstance(v, datetime):
                     c.number_format = _DTF
@@ -267,6 +274,10 @@ def build_carrier_weekly_export(carrier_name: str, rows: list, income_by_week: O
                 f.get("plate", ""), f.get("driver", ""), f.get("driver_phone", ""), None,
                 "", None, None, None, f.get("fines") or 0, note,
             ])
+        for a in b.get("adj", []):
+            # строка-расход: только примечание и сумма в N (не влияет на COUNTIF/суммы рейсов)
+            _put(["", "", "", "", "", "", None, "", None, None, None, None,
+                  f"Расход: {a.get('description') or ''}", a.get("amount") or 0])
 
         last = rownum - 1 if rownum > 2 else 1
         ws.freeze_panes = "A2"
@@ -284,8 +295,9 @@ def build_carrier_weekly_export(carrier_name: str, rows: list, income_by_week: O
             ("Всего строк", f'=COUNTA($A$2:$A${last})', _CNT),
             ("Сумма, ₽", f'=SUM($K$2:$K${last})', _MONEY),
             ("Сумма штрафов, ₽", f'=SUM($L$2:$L${last})', _MONEY),
-            ("Итого (сумма − штрафы), ₽", "=P7-P8", _MONEY),
-            ("К выплате (итого × ставка), ₽", "=P9*Сводная!$C$3", _MONEY),
+            ("Прочие расходы (удержания), ₽", f'=SUM($N$2:$N${last})', _MONEY),
+            ("Итого (сумма − штрафы − расходы), ₽", "=P7-P8-P9", _MONEY),
+            ("К выплате (итого × ставка), ₽", "=P10*Сводная!$C$3", _MONEY),
             ("Поступления (по дате платежа), ₽", round(income_by_week.get(monday, 0) or 0, 2), _MONEY),
         ]
         for i, (label, val, fmt) in enumerate(block, start=2):
@@ -307,7 +319,7 @@ def build_carrier_weekly_export(carrier_name: str, rows: list, income_by_week: O
     summary["D3"] = "← жёлтая ячейка: параметр (доля после СК). Пересчитывает «К выплате» на всех вкладках."
 
     head = ["Период (неделя)", "Вкладка", "Рейсов выполнено", "Рейсов отменено",
-            "Прочие статусы", "Всего строк", "Сумма, ₽", "Штрафы, ₽", "Итого, ₽",
+            "Прочие статусы", "Всего строк", "Сумма, ₽", "Штрафы, ₽", "Расходы, ₽", "Итого, ₽",
             "К выплате (Netto), ₽", "Поступления, ₽", "Накопит. остаток, ₽"]
     HROW = 5
     for ci, h in enumerate(head, start=1):
@@ -320,28 +332,28 @@ def build_carrier_weekly_export(carrier_name: str, rows: list, income_by_week: O
         t = f"'{title_of[monday]}'"
         summary.cell(row=r, column=1, value=_week_label(monday))
         summary.cell(row=r, column=2, value=title_of[monday])
-        for col, pref in ((3, "$P$3"), (4, "$P$4"), (5, "$P$5"), (6, "$P$6"), (7, "$P$7"), (8, "$P$8")):
+        for col, pref in ((3, "$P$3"), (4, "$P$4"), (5, "$P$5"), (6, "$P$6"), (7, "$P$7"), (8, "$P$8"), (9, "$P$9")):
             cc = summary.cell(row=r, column=col, value=f"={t}!{pref}")
             cc.number_format = _CNT if col <= 6 else _MONEY
-        summary.cell(row=r, column=9, value=f"=G{r}-H{r}").number_format = _MONEY
-        summary.cell(row=r, column=10, value=f"=I{r}*$C$3").number_format = _MONEY
-        summary.cell(row=r, column=11, value=f"={t}!$P$11").number_format = _MONEY
-        cum_prev = "" if r == first else f"L{r-1}+"
-        summary.cell(row=r, column=12, value=f"={cum_prev}J{r}-K{r}").number_format = _MONEY
+        summary.cell(row=r, column=10, value=f"=G{r}-H{r}-I{r}").number_format = _MONEY
+        summary.cell(row=r, column=11, value=f"=J{r}*$C$3").number_format = _MONEY
+        summary.cell(row=r, column=12, value=f"={t}!$P$12").number_format = _MONEY
+        cum_prev = "" if r == first else f"M{r-1}+"
+        summary.cell(row=r, column=13, value=f"={cum_prev}K{r}-L{r}").number_format = _MONEY
         r += 1
     lastr = r - 1
 
     # ИТОГО
     summary.cell(row=r, column=1, value="ИТОГО").font = Font(bold=True)
-    for col in range(3, 12):
+    for col in range(3, 13):
         L = get_column_letter(col)
         cc = summary.cell(row=r, column=col, value=f"=SUM({L}{first}:{L}{lastr})")
         cc.number_format = _CNT if col <= 6 else _MONEY
         cc.font = Font(bold=True)
-    tc = summary.cell(row=r, column=12, value=f"=L{lastr}")   # накопит остаток = последняя неделя
+    tc = summary.cell(row=r, column=13, value=f"=M{lastr}")   # накопит остаток = последняя неделя
     tc.number_format = _MONEY; tc.font = Font(bold=True)
 
-    widths = [24, 20, 15, 15, 14, 12, 15, 13, 15, 16, 15, 17]
+    widths = [24, 20, 15, 15, 14, 12, 15, 13, 13, 15, 16, 15, 17]
     for ci, w in enumerate(widths, start=1):
         summary.column_dimensions[get_column_letter(ci)].width = w
     summary.freeze_panes = "A6"
